@@ -5,7 +5,7 @@ first saw it.
 by signing date: Defense OT documents appear about 90 days after signing,
 other agencies' within days, so each run re-reads every document signed in
 the last LOOKBACK_DAYS and adds the ones not seen before with first_seen =
-the run date. Documents already stored keep their first_seen; their other
+the run's UTC time (ISO, seconds). Documents already stored keep their first_seen; their other
 fields are refreshed (FPDS records get corrected).
 
 A document signed more than LOOKBACK_DAYS before it first appears in FPDS is
@@ -77,7 +77,7 @@ def main(argv=None) -> None:
     p = argparse.ArgumentParser(prog="ota_watch.collect")
     p.add_argument("--since", help="signed on or after (default: today minus LOOKBACK_DAYS)")
     p.add_argument("--until", help="signed on or before (default: today)")
-    p.add_argument("--first-seen", help="value for first_seen of new documents (default: today, UTC)")
+    p.add_argument("--first-seen", help="value for first_seen of new documents (default: now, UTC)")
     a = p.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     today = dt.datetime.now(dt.timezone.utc).date()
@@ -85,7 +85,8 @@ def main(argv=None) -> None:
     until = dt.date.fromisoformat(a.until) if a.until else today
     docs = load()
     fetched = fpds.fetch_range(since, until)
-    out = merge(docs, fetched, a.first_seen or today.isoformat())
+    now = dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat()
+    out = merge(docs, fetched, a.first_seen or now)
     save(docs)
     out.update(window=[since.isoformat(), until.isoformat()], stored=len(docs))
     print(json.dumps(out))

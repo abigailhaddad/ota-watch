@@ -1,8 +1,9 @@
 """Build one weekly issue: the OT documents newly public in FPDS, with a few
 picked out by Claude.
 
-Which documents: those whose first_seen (data/documents.csv) is after the
-previous issue's date and on or before this issue's date. Documents marked
+Which documents: those whose first_seen (data/documents.csv, a UTC
+timestamp) is after the previous issue's cutoff (its build time) and on or
+before this one's, so a collection run between two issues is never lost. Documents marked
 first_seen = 'baseline' (already public when the project started) are never
 in a weekly issue. A launch issue can instead take a signed-date window
 (--signed-from/--signed-to).
@@ -22,8 +23,8 @@ What code does, and checks:
   not one of its records' obligations or their sum (within rounding);
 * dollars are obligations on each action, never FPDS's "total" fields.
 
-One issue per week: refuses to build one if the newest issue is less than 6
-days old.
+One issue per calendar week (Monday-Sunday): refuses to build one if the
+newest issue is in the same week, so a rerun or a late cron does nothing.
 
 Usage:
   uv run python -m ota_watch.digest                      # weekly (date = today, UTC)
@@ -47,7 +48,6 @@ ROOT = Path(__file__).resolve().parent.parent
 ISSUES = ROOT / "data" / "issues"
 MODEL = os.environ.get("OTA_MODEL", "claude-opus-5-5")
 MAX_PICKS = 5
-MIN_DAYS_BETWEEN = 6
 
 PROMPT = """You help write a weekly page about federal Other Transaction (OT) awards newly public in FPDS
 (the federal procurement database). OTs are agreements outside the normal contracting rules. Defense OT records
@@ -232,6 +232,10 @@ def build_issue(rows: list[dict], picks: list[dict], usage: dict, *, date: str, 
             "built_at": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")}
 
 
+def same_week(a: str, b: str) -> bool:
+    return dt.date.fromisoformat(a).isocalendar()[:2] == dt.date.fromisoformat(b).isocalendar()[:2]
+
+
 def issue_files() -> list[Path]:
     return sorted(ISSUES.glob("*.json"))
 
@@ -257,18 +261,17 @@ def main(argv=None, client=None) -> int:
     date = a.date or dt.datetime.now(dt.timezone.utc).date().isoformat()
     files = issue_files()
     last = json.loads(files[-1].read_text()) if files else None
-    if last and not a.dry_run:
-        gap = (dt.date.fromisoformat(date) - dt.date.fromisoformat(last["date"])).days
-        if gap < MIN_DAYS_BETWEEN:
-            print(f"newest issue is {last['date']} ({gap} days ago); one issue a week, nothing built")
-            return 0
+    if last and not a.dry_run and same_week(last["date"], date):
+        print(f"newest issue is {last['date']}, the same week as {date}; one issue a week, nothing built")
+        return 0
     if not (a.signed_from or a.signed_to) and last is None:
         raise SystemExit("no previous issue: give --signed-from/--signed-to for the first one")
     after = None if (a.signed_from or a.signed_to) else last["window"]["first_seen_to"]
-    rows = select(collect.load(), after=after, until=date, signed_from=a.signed_from, signed_to=a.signed_to)
-    window = ({"kind": "signed", "signed_from": a.signed_from, "signed_to": a.signed_to, "first_seen_to": date}
+    cutoff = dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat()
+    rows = select(collect.load(), after=after, until=cutoff, signed_from=a.signed_from, signed_to=a.signed_to)
+    window = ({"kind": "signed", "signed_from": a.signed_from, "signed_to": a.signed_to, "first_seen_to": cutoff}
               if (a.signed_from or a.signed_to) else
-              {"kind": "first_seen", "first_seen_after": after, "first_seen_to": date})
+              {"kind": "first_seen", "first_seen_after": after, "first_seen_to": cutoff})
     picks, usage = call_model(rows, client) if rows else ([], {})
     issue = build_issue(rows, picks, usage, date=date, window=window)
     print(json.dumps({k: issue[k] for k in ("date", "window", "summary")} | {

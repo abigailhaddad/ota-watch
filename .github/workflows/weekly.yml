@@ -5,7 +5,7 @@ name: Weekly OTA Watch
 # issue (data/issues/<date>.json; Claude picks, code checks), commit both, and
 # deploy the site (https://ota-watch.abigailhaddad.com, Cloudflare Pages project
 # ota-watch). One issue a week: the digest refuses to build one if the newest is
-# under 6 days old, so a rerun or a late cron does nothing.
+# in the same Monday-Sunday week, so a rerun or a late cron does nothing.
 #
 # Secrets: ANTHROPIC_API_KEY, CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID.
 # Variable: ANTHROPIC_WORKSPACE_ID (optional).

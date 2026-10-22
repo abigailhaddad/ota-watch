@@ -149,8 +149,8 @@ def window_label(issue: dict) -> str:
               if s.get("signed_from") else "")
     if w["kind"] == "signed":
         return f"Launch issue: every OT record {signed}. Most are Defense records, public about 90 days after signing."
-    after = date_label(w["first_seen_after"]) if w.get("first_seen_after") else "the start"
-    return (f"Every OT record that appeared in FPDS after {after}, up to {date_label(w['first_seen_to'])} "
+    after = date_label(w["first_seen_after"][:10]) if w.get("first_seen_after") else "the start"
+    return (f"Every OT record that appeared in FPDS after {after}, up to {date_label(w['first_seen_to'][:10])} "
             f"({signed}; Defense records are public about 90 days after signing).")
 
 

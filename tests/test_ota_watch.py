@@ -107,8 +107,9 @@ def test_one_issue_a_week(tmp_path, monkeypatch):
     def boom(*a, **k):
         raise AssertionError("built a second issue")
     monkeypatch.setattr(digest, "call_model", boom)
-    assert digest.main(["--date", "2026-10-26"]) == 0
+    assert digest.main(["--date", "2026-10-25"]) == 0                    # Sunday: same week as Thu 10-22
     assert sorted(p.name for p in tmp_path.iterdir()) == ["2026-10-22.json"]
+    assert digest.same_week("2026-10-22", "2026-10-25") and not digest.same_week("2026-10-22", "2026-10-26")
 
 
 def test_site_escapes_and_has_no_scripts(tmp_path):
@@ -137,3 +138,11 @@ def test_grouped_pick_shows_only_shared_facts():
     assert line.startswith("2 vendors") and "FA8819" in line
     assert "NORTHROP" not in line and "COMPETED" not in line
     assert site.shared_facts(recs[:1]).startswith("NORTHROP")
+
+
+def test_timestamped_first_seen_between_issues_is_not_lost():
+    docs = {k: doc(k, first_seen=fs) for k, fs in [
+        ("before", "2026-10-22T12:00:00+00:00"), ("same_day_after", "2026-10-22T18:00:00+00:00"),
+        ("monday", "2026-10-26T12:05:00+00:00"), ("baseline", "baseline")]}
+    got = digest.select(docs, after="2026-10-22T12:31:31+00:00", until="2026-10-26T12:30:00+00:00")
+    assert sorted(r["key"] for r in got) == ["monday", "same_day_after"]
