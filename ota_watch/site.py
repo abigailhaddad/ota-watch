@@ -217,7 +217,7 @@ record (each one links to FPDS's public feed, which shows it as XML) before rely
 <p>Spotted a wrong pick, quote or figure, or have a suggestion?
 <a href="{ISSUE_URL}">Open an issue on GitHub</a>.</p>
 <p><strong>All the data.</strong> Every OT record in FPDS is on Hugging Face as Parquet and
-CSV, updated weekly: <a href="{e(DATASET_URL)}">huggingface.co/datasets/abigailhaddad/ota-watch</a>.</p>
+CSV, updated daily: <a href="{e(DATASET_URL)}">huggingface.co/datasets/abigailhaddad/ota-watch</a>.</p>
 <p>Code, the recent records the weekly lists use (<code>data/documents.csv</code>) and rules:
 <a href="{e(PROJECT_URL)}">github.com/abigailhaddad/ota-watch</a>. RSS: <a href="feed.xml">feed.xml</a>.
 No JavaScript, no cookies, no trackers.</p>"""

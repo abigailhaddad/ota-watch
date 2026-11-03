@@ -18,9 +18,9 @@ Two commands:
       data/documents.csv laid over it: a document in documents.csv replaces
       the older copy, and keeps its first_seen. Documents only in the history
       get first_seen = "baseline" (public before this project started).
-      Run weekly after collect; needs HF_TOKEN.
+      Run daily after collect; needs HF_TOKEN.
 
-A document signed more than ~400 days ago is not re-read weekly, so an FPDS
+A document signed more than ~400 days ago is not re-read daily, so an FPDS
 correction to one reaches the dataset only when the backfill is rerun.
 """
 
@@ -249,7 +249,7 @@ unique per document (`kind|agency_id|piid|mod|parent_piid`; order PIIDs repeat a
   `uei`. {st["awards_without_base"]:,} of {st["awards"]:,} agreements and orders have no base document.
 * **`first_seen`** is when ota-watch first saw the document in FPDS; `baseline` means it was already public
   when the project started, so it says nothing about when FPDS published it.
-* **Refreshes.** Documents signed in the last ~400 days are re-read from FPDS weekly. Older ones are as FPDS
+* **Refreshes.** Documents signed in the last ~400 days are re-read from FPDS daily. Older ones are as FPDS
   showed them when the history was last read in full (`python -m ota_watch.hf backfill`).
 * Only what FPDS's public feed shows. An OT never reported to FPDS is not here.
 
