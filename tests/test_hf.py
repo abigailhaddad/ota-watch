@@ -94,3 +94,17 @@ def test_backfill_starts_at_the_first_year_fpds_has(monkeypatch, tmp_path):
     hf.backfill(tmp_path, until=dt.date(2025, 12, 31))
     assert read == [2024, 2025]
     assert len(hf.load_history(tmp_path)) == 5
+
+
+def test_idv_overlap_bound_and_timing():
+    rows, _ = hf.merge([
+        row("I0", kind="OtherTransactionIDV", agency_id="97", piid="V1", signed="2020-01-01", obligated=100.0),
+        row("I1", kind="OtherTransactionIDV", agency_id="97", piid="V1", signed="2022-01-01", obligated=10.0),
+        row("O1", kind="OtherTransactionAward", action_type="OTHER TRANSACTION ORDER", parent_agency_id="97",
+            parent_piid="V1", signed="2021-01-01", obligated=30.0),
+        row("I2", kind="OtherTransactionIDV", agency_id="97", piid="V2", signed="2020-01-01", obligated=50.0),
+    ], {})
+    st = hf.stats(rows)
+    assert (st["idvs"], st["idvs_with_orders"]) == (2, 1)
+    assert st["on_idvs_with_orders"] == 110.0 and st["on_idvs_with_orders_before_first_order"] == 100.0
+    assert st["overlap_bound"] == 30.0

@@ -175,11 +175,39 @@ def stats(rows: list[dict]) -> dict:
         "ueis_with_several_names": sum(len(v) > 1 for v in names.values()),
         "awards_without_base": sum("0" not in m for m in mods.values()), "awards": len(mods),
         "departments": collections.Counter(r["department"] for r in rows).most_common(),
+        **_idv_overlap(rows),
         "dod_days_to_public": _quantiles([
             (dt.date.fromisoformat(r["first_seen"][:10]) - dt.date.fromisoformat(r["signed"])).days
             for r in rows if r["department"] == "DEPT OF DEFENSE" and r["signed"]
             and r["first_seen"] not in (None, "", "baseline")]),
     }
+
+
+def _idv_overlap(rows: list[dict]) -> dict:
+    """How much money could be reported both on an OT IDV and on its orders.
+
+    The bound: per IDV, the smaller of the money on the IDV's own documents
+    and the money on its orders' documents. Also: how much of the money on
+    IDVs that have orders was obligated before the IDV's first order."""
+    idv, orders, first = collections.defaultdict(float), collections.defaultdict(float), {}
+    idv_actions = collections.defaultdict(list)
+    for r in rows:
+        if r["kind"] == "OtherTransactionIDV":
+            k = (r["agency_id"], r["piid"])
+            idv[k] += r["obligated"] or 0
+            idv_actions[k].append(r)
+        elif r["action_type"] == "OTHER TRANSACTION ORDER":
+            k = (r["parent_agency_id"], r["parent_piid"])
+            orders[k] += r["obligated"] or 0
+            if r["signed"] and (k not in first or r["signed"] < first[k]):
+                first[k] = r["signed"]
+    with_orders = [k for k in idv if k in orders]
+    before = sum(r["obligated"] or 0 for k in with_orders for r in idv_actions[k]
+                 if k in first and r["signed"] and r["signed"] < first[k])
+    return {"idvs": len(idv), "idvs_with_orders": len(with_orders),
+            "on_idvs_with_orders": sum(idv[k] for k in with_orders),
+            "on_idvs_with_orders_before_first_order": before,
+            "overlap_bound": sum(max(min(idv[k], orders[k]), 0) for k in with_orders)}
 
 
 def _quantiles(xs: list[int]) -> dict | None:
@@ -256,7 +284,12 @@ unique per document (`kind|agency_id|piid|mod|parent_piid`; order PIIDs repeat a
   a blank before then means unknown, not "no".
 * **OT IDVs carry money:** {_money_b(st["obligated_on_idv"])} of the
   {_money_b(st["obligated"])} obligated is on `OtherTransactionIDV` documents. Orders under an IDV carry
-  money too; whether any is reported on both hasn't been checked.
+  money too. {st["idvs"] - st["idvs_with_orders"]:,} of the {st["idvs"]:,} IDVs have no orders here. For the
+  {st["idvs_with_orders"]:,} that do, the most that could be reported on both the IDV and its orders is
+  {_money_b(st["overlap_bound"])} (per IDV, the smaller of the two), and
+  {_money_b(st["on_idvs_with_orders_before_first_order"])} of the {_money_b(st["on_idvs_with_orders"])} on
+  those IDVs was obligated before the IDV's first order. Whether any money is actually reported twice can't
+  be told from FPDS.
 * **The mix of agencies changes** (DoD and DHS columns above): early years are mostly DHS.
 * **`agreement_type`** is PRODUCTION on no document before fiscal {st["first_fy_production"]}. Whether
   earlier PROTOTYPE values were recorded or filled in by default isn't known.
