@@ -7,7 +7,10 @@ name: Weekly OTA Watch
 # ota-watch). One issue a week: the digest refuses to build one if the newest is
 # in the same Monday-Sunday week, so a rerun or a late cron does nothing.
 #
-# Secrets: ANTHROPIC_API_KEY, CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID.
+# Then lay this week's documents.csv over the full-history Hugging Face dataset
+# (abigailhaddad/ota-watch, every OT document FPDS has; see ota_watch/hf.py).
+#
+# Secrets: ANTHROPIC_API_KEY, CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, HF_TOKEN.
 # Variable: ANTHROPIC_WORKSPACE_ID (optional).
 on:
   schedule:
@@ -55,3 +58,8 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           wranglerVersion: "4.42.0"
           command: pages deploy site/dist --project-name=ota-watch --branch=main
+      - name: Update the Hugging Face dataset
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_HUB_DISABLE_PROGRESS_BARS: "1"
+        run: uv run python -m ota_watch.hf publish

@@ -3,6 +3,9 @@
 **https://ota-watch.abigailhaddad.com**: every federal Other Transaction (OT) award record newly public in
 FPDS, listed weekly, with the most remarkable few picked out and summarized by Claude.
 
+**Every OT record in FPDS**, not just the recent ones the site uses, is on Hugging Face: [abigailhaddad/ota-watch](https://huggingface.co/datasets/abigailhaddad/ota-watch),
+as Parquet and CSV, updated weekly.
+
 OTs are agreements made outside the Federal Acquisition Regulation, mostly by the Defense Department for
 prototypes and follow-on production. They are reported to FPDS (the federal procurement database) but not to
 USAspending. FPDS's public ATOM feed is the only source used here.
@@ -20,7 +23,10 @@ USAspending. FPDS's public ATOM feed is the only source used here.
    dollar figure must be one of the pick's records' obligations or their sum; a pick that fails is dropped
    (kept in the issue file under `dropped`). All other numbers on the page (counts, totals, fact lines) are
    computed from the records, not written by the model. One issue a week at most.
-3. **Site** (`ota_watch/site.py`): static pages from `data/issues/*.json`, deployed to Cloudflare Pages.
+3. **Hugging Face** (`ota_watch/hf.py`): the full history (a one-off backfill of every OT document FPDS has)
+   with `data/documents.csv` laid over it each week. Documents signed more than ~400 days ago aren't re-read
+   weekly; rerun `python -m ota_watch.hf backfill DIR` and `publish --history DIR` to refresh them.
+4. **Site** (`ota_watch/site.py`): static pages from `data/issues/*.json`, deployed to Cloudflare Pages.
    No JavaScript, no cookies, no trackers.
 
 ## Caveats
@@ -40,6 +46,7 @@ uv run pytest
 uv run python -m ota_watch.collect                       # this week's FPDS read
 ANTHROPIC_API_KEY=... uv run python -m ota_watch.digest  # this week's issue
 uv run python -m ota_watch.site --out site/dist
+HF_TOKEN=... uv run python -m ota_watch.hf publish     # update the Hugging Face dataset
 ```
 
 Spotted a wrong pick, quote or figure? [Open an issue](https://github.com/abigailhaddad/ota-watch/issues/new).

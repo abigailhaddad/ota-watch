@@ -5,6 +5,8 @@ description = "Weekly list of federal Other Transaction (OT) awards newly public
 requires-python = ">=3.11"
 dependencies = [
     "anthropic>=0.70",
+    "huggingface-hub>=2.4.0",
+    "pyarrow>=26.0.1",
     "requests>=2.32",
 ]
 
