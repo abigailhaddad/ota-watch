@@ -174,7 +174,21 @@ def stats(rows: list[dict]) -> dict:
         "reconstructed_obligated": sum(r["obligated"] or 0 for r in recon),
         "ueis_with_several_names": sum(len(v) > 1 for v in names.values()),
         "awards_without_base": sum("0" not in m for m in mods.values()), "awards": len(mods),
+        "departments": collections.Counter(r["department"] for r in rows).most_common(),
+        "dod_days_to_public": _quantiles([
+            (dt.date.fromisoformat(r["first_seen"][:10]) - dt.date.fromisoformat(r["signed"])).days
+            for r in rows if r["department"] == "DEPT OF DEFENSE" and r["signed"]
+            and r["first_seen"] not in (None, "", "baseline")]),
     }
+
+
+def _quantiles(xs: list[int]) -> dict | None:
+    """n, 10th, 50th and 90th percentile (nearest rank) of xs, or None if empty."""
+    if not xs:
+        return None
+    xs = sorted(xs)
+    at = lambda q: xs[min(len(xs) - 1, int(q * len(xs)))]  # noqa: E731
+    return {"n": len(xs), "p10": at(0.1), "p50": at(0.5), "p90": at(0.9)}
 
 
 def card(rows: list[dict], built: str) -> str:
@@ -187,6 +201,11 @@ def card(rows: list[dict], built: str) -> str:
         f"| {fy} | {c['documents']:,} | {pct(c['dod'], c['documents'])} | {pct(c['dhs'], c['documents'])} "
         f"| {c['consortium']:,} | {c['production']:,} |" for fy, c in st["years"].items())
     vendors = "; ".join(f"{v} ({n:,})" for v, n in st["top_vendors"])
+    depts = "; ".join(f"{d} ({n:,})" for d, n in st["departments"])
+    q = st["dod_days_to_public"]
+    delay = ("" if q is None else
+             f" Of the {q['n']:,} Defense documents ota-watch has watched appear, the median appeared {q['p50']} "
+             f"days after signing (10th-90th percentile {q['p10']}-{q['p90']}).")
     return f"""---
 license: other
 pretty_name: OTA Watch - every federal Other Transaction record in FPDS
@@ -201,8 +220,8 @@ configs:
 Every Other Transaction document FPDS's public ATOM feed returns for the query
 `AWARD_TYPE:"OTHER TRANSACTION"`: {len(rows):,} documents, signed {oldest} to {newest}.
 Built {built} by [ota-watch](https://github.com/abigailhaddad/ota-watch), which also runs the weekly
-site [ota-watch.abigailhaddad.com](https://ota-watch.abigailhaddad.com). Every figure on this page is
-computed from the table when it is built.
+site [ota-watch.abigailhaddad.com](https://ota-watch.abigailhaddad.com). Every count and dollar figure on
+this page is computed from the table when it is built.
 
 OTs are agreements made outside the Federal Acquisition Regulation, mostly by the Defense Department for
 prototypes and follow-on production. They are reported to FPDS but not to USAspending.
@@ -226,29 +245,33 @@ unique per document (`kind|agency_id|piid|mod|parent_piid`; order PIIDs repeat a
 
 ## Caveats
 
+* **Only {len(st["departments"])} contracting departments.** Every document's contracting office is in one of:
+  {depts}. Another agency shows up only as `funding_agency`, when one of these offices contracts for it.
+  An agency whose OTs aren't reported to FPDS isn't here at all.
 * **Use `obligated`**, the money obligated by that one action. FPDS's total and base-and-all-options values
   on OT records disagree with each other along a record chain; they are kept only as `total_obligated_raw`
   and `total_all_options_raw`.
-* **The vendor is often a consortium manager**, not the company doing the work. The most frequent vendors:
+* **The vendor is often a consortium or the organization that manages one**, not the company doing the work. The most frequent vendors:
   {vendors}. The `consortium` flag is filled in from fiscal {st["first_fy_consortium"]} (see the table), so
   a blank before then means unknown, not "no".
-* **OT IDVs carry money**, unlike most FAR vehicles: {_money_b(st["obligated_on_idv"])} of the
+* **OT IDVs carry money:** {_money_b(st["obligated_on_idv"])} of the
   {_money_b(st["obligated"])} obligated is on `OtherTransactionIDV` documents. Orders under an IDV carry
   money too; whether any is reported on both hasn't been checked.
 * **The mix of agencies changes** (DoD and DHS columns above): early years are mostly DHS.
-* **`agreement_type`** is PRODUCTION on no document before fiscal {st["first_fy_production"]}; treat
-  earlier PROTOTYPE values as a default, not a fact.
+* **`agreement_type`** is PRODUCTION on no document before fiscal {st["first_fy_production"]}. Whether
+  earlier PROTOTYPE values were recorded or filled in by default isn't known.
 * **Dates.** {st["entered_over_a_year_late"]:,} documents were entered in FPDS more than a year after they
   were signed. {st["reconstructions"]:,} descriptions say the record is a "reconstruction"
   ({_money_b(st["reconstructed_obligated"])} obligated), which can fold earlier modifications into one
   document under a later date. Defense records become public about 90 days after signing, so the latest
-  months are incomplete.
+  months are incomplete.{delay}
 * **Deobligations:** {st["deobligations"]:,} documents have negative `obligated`
   ({_money_b(st["deobligated"])} in total); sums are net.
 * **Names vary:** {st["ueis_with_several_names"]:,} UEIs appear under more than one vendor name; group by
   `uei`. {st["awards_without_base"]:,} of {st["awards"]:,} agreements and orders have no base document.
-* **`first_seen`** is when ota-watch first saw the document in FPDS; `baseline` means it was already public
-  when the project started, so it says nothing about when FPDS published it.
+* **`first_seen`** is when ota-watch's daily collection first saw the document in FPDS. `baseline` means
+  it didn't: it was already public when the project started, or was signed too long ago for the collection's
+  ~400-day window. It says nothing about when FPDS published the document.
 * **Refreshes.** Documents signed in the last ~400 days are re-read from FPDS daily. Older ones are as FPDS
   showed them when the history was last read in full (`python -m ota_watch.hf backfill`).
 * Only what FPDS's public feed shows. An OT never reported to FPDS is not here.
