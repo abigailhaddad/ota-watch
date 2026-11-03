@@ -30,6 +30,7 @@ from .digest import ISSUES, money
 TITLE = "OTA Watch"
 SITE_URL = "https://ota-watch.abigailhaddad.com"
 PROJECT_URL = "https://github.com/abigailhaddad/ota-watch"
+DATASET_URL = "https://huggingface.co/datasets/abigailhaddad/ota-watch"
 ISSUE_URL = PROJECT_URL + "/issues/new"
 TAGLINE = ("Federal Other Transaction (OT) awards newly public in FPDS, all listed each week, "
            "with the most remarkable few picked out and summarized by Claude")
@@ -79,6 +80,7 @@ def page(title: str, body: str, *, root: str = "", home: bool = False) -> str:
 <footer class="site"><p>Picks chosen and written up by Claude; every figure and fact line comes from the FPDS
 records, and quotes are checked against them. Check the source before relying on anything.
 <a href="{root}about.html">About</a> · {past_footer}<a href="{root}feed.xml">RSS</a> ·
+<a href="{DATASET_URL}">All OT records (Hugging Face)</a> ·
 <a href="{ISSUE_URL}">Report a problem (GitHub issue)</a></p></footer>
 </body>
 </html>
@@ -214,7 +216,9 @@ a pick whose dollar figures don't match its records is dropped. AI can still mis
 record (each one links to FPDS's public feed, which shows it as XML) before relying on anything.</p>
 <p>Spotted a wrong pick, quote or figure, or have a suggestion?
 <a href="{ISSUE_URL}">Open an issue on GitHub</a>.</p>
-<p>Code, data (every OT record collected, <code>data/documents.csv</code>) and rules:
+<p><strong>All the data.</strong> Every OT record in FPDS is on Hugging Face as Parquet and
+CSV, updated daily: <a href="{e(DATASET_URL)}">huggingface.co/datasets/abigailhaddad/ota-watch</a>.</p>
+<p>Code, the recent records the weekly lists use (<code>data/documents.csv</code>) and rules:
 <a href="{e(PROJECT_URL)}">github.com/abigailhaddad/ota-watch</a>. RSS: <a href="feed.xml">feed.xml</a>.
 No JavaScript, no cookies, no trackers.</p>"""
     return page(f"About · {TITLE}", body)

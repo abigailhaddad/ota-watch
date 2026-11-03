@@ -15,7 +15,7 @@ $14.85M funding action entered 9 months late). 400 days covers that; a full
 400-day read is about 7,500 documents, ~12 minutes.
 
 Usage:
-  uv run python -m ota_watch.collect                 # weekly
+  uv run python -m ota_watch.collect                 # daily
   uv run python -m ota_watch.collect --since 2025-10-01 --first-seen baseline
       # one-off backfill; first_seen 'baseline' marks documents that were
       # already public before this project started
