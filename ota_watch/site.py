@@ -25,7 +25,7 @@ import urllib.parse
 from email.utils import format_datetime
 from pathlib import Path
 
-from .digest import ISSUES, money
+from .digest import ISSUES, MAX_PICKS, money
 
 TITLE = "OTA Watch"
 SITE_URL = "https://ota-watch.abigailhaddad.com"
@@ -150,10 +150,10 @@ def window_label(issue: dict) -> str:
     signed = (f"signed {date_label(s['signed_from'])} to {date_label(s['signed_to'])}"
               if s.get("signed_from") else "")
     if w["kind"] == "signed":
-        return f"Launch issue: every OT record {signed}. Most are Defense records, public about 90 days after signing."
+        return f"Launch issue: every OT record {signed}. Defense records become public months after signing."
     after = date_label(w["first_seen_after"][:10]) if w.get("first_seen_after") else "the start"
     return (f"Every OT record that appeared in FPDS after {after}, up to {date_label(w['first_seen_to'][:10])} "
-            f"({signed}; Defense records are public about 90 days after signing).")
+            f"({signed}; Defense records become public months after signing).")
 
 
 def issue_content(issue: dict) -> str:
@@ -202,14 +202,15 @@ def about_page() -> str:
     body = f"""<h1>About {e(TITLE)}</h1>
 <p>{e(TAGLINE)}.</p>
 <p><strong>What an OT is.</strong> Other Transactions are agreements made outside the Federal Acquisition
-Regulation, mostly by the Defense Department for prototypes and their follow-on production. They are reported to
+Regulation for prototypes and their follow-on production. They are reported to
 FPDS, the federal procurement database, but not to USAspending.</p>
 <p><strong>What each week has.</strong> Every OT record that first appeared in FPDS since the previous week:
 new agreements, orders and vehicles, and modifications. Each record is one action, and its dollar amount is what
-that action obligated. Claude reads them all and picks out a few (at most five, sometimes none).</p>
-<p><strong>The 90-day delay.</strong> Defense records become public in FPDS about 90 days after they are
-signed, and some are entered months later still, so most of each week's records were signed about three months
-before. Other agencies' records appear within days.</p>
+that action obligated. Claude reads them all and picks out a few (at most {MAX_PICKS}, sometimes none).</p>
+<p><strong>The Defense delay.</strong> Defense records become public in FPDS months after they are signed, and
+some are entered later still, so most of each week's Defense records were signed months before. Other agencies'
+records can appear sooner. The <a href="{e(DATASET_URL)}">dataset card</a> gives the delay measured from the
+data.</p>
 <p><strong>Chosen and written up by Claude.</strong> The headlines and explanations are Claude's. The fact lines,
 amounts and totals come straight from the FPDS records, a pick's quote must appear in its record's description, and
 a pick whose dollar figures don't match its records is dropped. AI can still misread a record: check the FPDS
