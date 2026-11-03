@@ -1,7 +1,7 @@
 """Every OT document FPDS has ever made public, on Hugging Face.
 
 data/documents.csv (the weekly site's table) only covers documents signed in
-the last ~400 days. The Hugging Face dataset abigailhaddad/ota-watch holds
+the last collect.LOOKBACK_DAYS. The Hugging Face dataset abigailhaddad/ota-watch holds
 all of them.
 
 Two commands:
@@ -20,7 +20,7 @@ Two commands:
       get first_seen = "baseline" (public before this project started).
       Run daily after collect; needs HF_TOKEN.
 
-A document signed more than ~400 days ago is not re-read daily, so an FPDS
+A document signed before that window is not re-read daily, so an FPDS
 correction to one reaches the dataset only when the backfill is rerun.
 """
 
@@ -251,8 +251,8 @@ Built {built} by [ota-watch](https://github.com/abigailhaddad/ota-watch), which 
 site [ota-watch.abigailhaddad.com](https://ota-watch.abigailhaddad.com). Every count and dollar figure on
 this page is computed from the table when it is built.
 
-OTs are agreements made outside the Federal Acquisition Regulation, mostly by the Defense Department for
-prototypes and follow-on production. They are reported to FPDS but not to USAspending.
+OTs are agreements made outside the Federal Acquisition Regulation for prototypes and follow-on
+production. They are reported to FPDS but not to USAspending.
 
 ## Files
 
@@ -296,7 +296,7 @@ unique per document (`kind|agency_id|piid|mod|parent_piid`; order PIIDs repeat a
 * **Dates.** {st["entered_over_a_year_late"]:,} documents were entered in FPDS more than a year after they
   were signed. {st["reconstructions"]:,} descriptions say the record is a "reconstruction"
   ({_money_b(st["reconstructed_obligated"])} obligated), which can fold earlier modifications into one
-  document under a later date. Defense records become public about 90 days after signing, so the latest
+  document under a later date. Defense records become public months after signing, so the latest
   months are incomplete.{delay}
 * **Deobligations:** {st["deobligations"]:,} documents have negative `obligated`
   ({_money_b(st["deobligated"])} in total); sums are net.
@@ -304,8 +304,8 @@ unique per document (`kind|agency_id|piid|mod|parent_piid`; order PIIDs repeat a
   `uei`. {st["awards_without_base"]:,} of {st["awards"]:,} agreements and orders have no base document.
 * **`first_seen`** is when ota-watch's daily collection first saw the document in FPDS. `baseline` means
   it didn't: it was already public when the project started, or was signed too long ago for the collection's
-  ~400-day window. It says nothing about when FPDS published the document.
-* **Refreshes.** Documents signed in the last ~400 days are re-read from FPDS daily. Older ones are as FPDS
+  {collect.LOOKBACK_DAYS}-day window. It says nothing about when FPDS published the document.
+* **Refreshes.** Documents signed in the last {collect.LOOKBACK_DAYS} days are re-read from FPDS daily. Older ones are as FPDS
   showed them when the history was last read in full (`python -m ota_watch.hf backfill`).
 * Only what FPDS's public feed shows. An OT never reported to FPDS is not here.
 
