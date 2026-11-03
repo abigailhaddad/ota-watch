@@ -12,8 +12,8 @@ base award or a modification.
 
 Dollars: only `obligated` (the money obligated by this one action) is used
 for anything shown. FPDS's "total" and "base and all options" fields on OT
-documents are kept as raw columns but are unreliable (one DoD OT reads
-$100M, $281M and $351.6M in different fields of the same record chain).
+documents are kept as raw columns but are unreliable: they disagree with
+each other and along a record chain.
 
 Defense OT documents become public about 90 days after they are signed (the
 DoD release delay); other agencies' appear within days.
