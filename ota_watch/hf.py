@@ -1,7 +1,7 @@
 """Every OT document FPDS has ever made public, on Hugging Face.
 
 data/documents.csv (the weekly site's table) only covers documents signed in
-the last collect.LOOKBACK_DAYS. The Hugging Face dataset abigailhaddad/ota-watch holds
+the last collect.LOOKBACK_DAYS. The Hugging Face dataset (config.HF_REPO_ID) holds
 all of them.
 
 Two commands:
@@ -40,8 +40,9 @@ from pathlib import Path
 import requests
 
 from . import collect, fpds
+from .config import HF_REPO_ID, PROJECT_URL, SITE_HOST, SITE_URL
 
-REPO_ID = "abigailhaddad/ota-watch"
+REPO_ID = HF_REPO_ID
 PARQUET = "data/ot_documents.parquet"
 CSV = "data/ot_documents.csv"
 MONEY = {"obligated", "total_obligated_raw", "total_all_options_raw"}
@@ -247,8 +248,8 @@ configs:
 
 Every Other Transaction document FPDS's public ATOM feed returns for the query
 `AWARD_TYPE:"OTHER TRANSACTION"`: {len(rows):,} documents, signed {oldest} to {newest}.
-Built {built} by [ota-watch](https://github.com/abigailhaddad/ota-watch), which also runs the weekly
-site [ota-watch.abigailhaddad.com](https://ota-watch.abigailhaddad.com). Every count and dollar figure on
+Built {built} by [ota-watch]({PROJECT_URL}), which also runs the weekly
+site [{SITE_HOST}]({SITE_URL}). Every count and dollar figure on
 this page is computed from the table when it is built.
 
 OTs are agreements made outside the Federal Acquisition Regulation for prototypes and follow-on

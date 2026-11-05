@@ -25,13 +25,10 @@ import urllib.parse
 from email.utils import format_datetime
 from pathlib import Path
 
+from .config import DATASET_URL, GITHUB_REPO, HF_REPO_ID, ISSUE_URL, PROJECT_URL, SITE_URL
 from .digest import ISSUES, MAX_PICKS, money
 
 TITLE = "OTA Watch"
-SITE_URL = "https://ota-watch.abigailhaddad.com"
-PROJECT_URL = "https://github.com/abigailhaddad/ota-watch"
-DATASET_URL = "https://huggingface.co/datasets/abigailhaddad/ota-watch"
-ISSUE_URL = PROJECT_URL + "/issues/new"
 TAGLINE = ("Federal Other Transaction (OT) awards newly public in FPDS, all listed each week, "
            "with the most remarkable few picked out and summarized by Claude")
 FEED_ITEMS = 20
@@ -218,9 +215,9 @@ record (each one links to FPDS's public feed, which shows it as XML) before rely
 <p>Spotted a wrong pick, quote or figure, or have a suggestion?
 <a href="{ISSUE_URL}">Open an issue on GitHub</a>.</p>
 <p><strong>All the data.</strong> Every OT record in FPDS is on Hugging Face as Parquet and
-CSV, updated daily: <a href="{e(DATASET_URL)}">huggingface.co/datasets/abigailhaddad/ota-watch</a>.</p>
+CSV, updated daily: <a href="{e(DATASET_URL)}">huggingface.co/datasets/{e(HF_REPO_ID)}</a>.</p>
 <p>Code, the recent records the weekly lists use (<code>data/documents.csv</code>) and rules:
-<a href="{e(PROJECT_URL)}">github.com/abigailhaddad/ota-watch</a>. RSS: <a href="feed.xml">feed.xml</a>.
+<a href="{e(PROJECT_URL)}">github.com/{e(GITHUB_REPO)}</a>. RSS: <a href="feed.xml">feed.xml</a>.
 No JavaScript, no cookies, no trackers.</p>"""
     return page(f"About · {TITLE}", body)
 

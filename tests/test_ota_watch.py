@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from ota_watch import collect, digest, fpds, site
+from ota_watch.config import ISSUE_URL
 
 FIX = Path(__file__).parent / "fixtures"
 
@@ -124,7 +125,7 @@ def test_site_escapes_and_has_no_scripts(tmp_path):
         t = (out / f).read_text()
         assert "<script" not in t and "javascript:" not in t, f
     h = (out / "issues/2026-10-26.html").read_text()
-    assert "&lt;script&gt;" in h and 'href="https://github.com/abigailhaddad/ota-watch/issues/new"' in h
+    assert "&lt;script&gt;" in h and 'href="' + ISSUE_URL + '"' in h
     assert 'href="https://www.fpds.gov/ezsearch/FEEDS/ATOM?FEEDNAME=PUBLIC&amp;q=PIID%3A%22A%22"' in h
     assert "Past weeks" in h and "Past weeks" not in (out / "index.html").read_text()
     ET.fromstring((out / "feed.xml").read_text())                         # well-formed RSS
