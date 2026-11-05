@@ -6,15 +6,16 @@ name: OTA Watch
 # also build the week's issue (data/issues/<date>.json; Claude picks, code
 # checks) -- the only step that calls Claude. The issue takes every document
 # first seen since the previous issue's cutoff, so daily collection changes
-# nothing about what's in it. Then deploy the site (https://ota-watch.abigailhaddad.com, Cloudflare Pages project
-# ota-watch). One issue a week: the digest refuses to build one if the newest is
-# in the same Monday-Sunday week, so a rerun or a late cron does nothing.
+# nothing about what's in it. Then deploy the site to the Cloudflare Pages project
+# named by the CLOUDFLARE_PROJECT variable (default ota-watch). One issue a week: the
+# digest refuses to build one if the newest is in the same Monday-Sunday week, so a
+# rerun or a late cron does nothing.
 #
-# The Hugging Face dataset (abigailhaddad/ota-watch) is every OT document FPDS
-# has, with documents.csv laid over it; see ota_watch/hf.py.
+# The Hugging Face dataset (OTA_HF_REPO, see ota_watch/config.py) is every OT document
+# FPDS has, with documents.csv laid over it; see ota_watch/hf.py.
 #
 # Secrets: ANTHROPIC_API_KEY, CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, HF_TOKEN.
-# Variable: ANTHROPIC_WORKSPACE_ID (optional).
+# Variables (optional): ANTHROPIC_WORKSPACE_ID, CLOUDFLARE_PROJECT.
 on:
   schedule:
     - cron: "0 12 * * *"
@@ -69,7 +70,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           wranglerVersion: "4.42.0"
-          command: pages deploy site/dist --project-name=ota-watch --branch=main
+          command: pages deploy site/dist --project-name=${{ vars.CLOUDFLARE_PROJECT || 'ota-watch' }} --branch=main
       - name: Update the Hugging Face dataset
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}

@@ -314,6 +314,26 @@ Data: U.S. government data from FPDS. Code: MIT.
 """
 
 
+def current_rows(api, download) -> list[dict]:
+    """The table now on the dataset, as a list of dicts; [] if there isn't one yet.
+
+    Creates the dataset repo first if it doesn't exist, so the very first publish
+    works. A repo with no table in it (new, or its table was removed) counts as
+    empty: the publish then writes only what collect.load() has (the last
+    LOOKBACK_DAYS), and `publish --history DIR` is how to start from full history.
+    """
+    import pyarrow.parquet as pq
+    from huggingface_hub.errors import EntryNotFoundError, RepositoryNotFoundError
+
+    api.create_repo(REPO_ID, repo_type="dataset", exist_ok=True)
+    try:
+        path = download(REPO_ID, PARQUET, repo_type="dataset")
+    except (EntryNotFoundError, RepositoryNotFoundError):
+        log.info("%s has no %s yet; starting from an empty table", REPO_ID, PARQUET)
+        return []
+    return pq.read_table(path).to_pylist()
+
+
 def publish(history: Path | None) -> None:
     from huggingface_hub import HfApi, hf_hub_download
     import pyarrow as pa
@@ -323,7 +343,7 @@ def publish(history: Path | None) -> None:
     if history:
         base = load_history(history)
     else:
-        base = pq.read_table(hf_hub_download(REPO_ID, PARQUET, repo_type="dataset")).to_pylist()
+        base = current_rows(api, hf_hub_download)
     rows, counts = merge(base, collect.load())
     schema = pa.schema([(c, pa.float64() if c in MONEY else pa.string()) for c in COLUMNS])
     buf = io.BytesIO()

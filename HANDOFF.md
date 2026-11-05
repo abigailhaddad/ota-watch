@@ -37,6 +37,7 @@ Set these under Settings > Secrets and variables > Actions. The workflow reads t
 | `CLOUDFLARE_API_TOKEN` | secret | Deploying the site to Cloudflare Pages. |
 | `CLOUDFLARE_ACCOUNT_ID` | secret | Same deploy. |
 | `ANTHROPIC_WORKSPACE_ID` | variable, optional | Sent as a header on Claude calls if set. |
+| `CLOUDFLARE_PROJECT` | variable, optional | Name of the Cloudflare Pages project to deploy to. Defaults to `ota-watch`. |
 
 The model is `claude-opus-5-5` unless the environment variable `OTA_MODEL` says otherwise (`ota_watch/digest.py`).
 
@@ -50,12 +51,12 @@ All names live in `ota_watch/config.py`. Each can be set with an environment var
 | Hugging Face dataset | `OTA_HF_REPO` | `abigailhaddad/ota-watch` |
 | Site address | `OTA_SITE_URL` | `https://ota-watch.abigailhaddad.com` |
 
-The workflow can't read that file, so these places still need editing by hand:
+The workflow can't read that file, so these places are set separately:
 
-- `.github/workflows/weekly.yml`: the Cloudflare Pages project name, `--project-name=ota-watch`, on the deploy step. Also the comments at the top, which mention the old site address and dataset.
-- `README.md`: the site address in the first line, the dataset link, and the "Open an issue" link at the bottom.
-- The Cloudflare side: the Pages project itself and its custom domain are set up in Cloudflare, not in this repo. I couldn't see them from here.
-- The Hugging Face dataset under the new owner needs its table in place before the daily publish works. Publish first downloads the current table from the dataset, and only afterwards creates the repo if it's missing, so on a brand-new dataset the daily run fails. Do the first publish by hand with the backfill below (`publish --history DIR`), or copy the old dataset over.
+- **Cloudflare Pages project name.** The deploy step reads the repository variable `CLOUDFLARE_PROJECT` and falls back to `ota-watch` if it isn't set. Set it under Settings > Secrets and variables > Actions > Variables if the new project has a different name. The comments at the top of `.github/workflows/weekly.yml` point to the variables instead of naming the old site or dataset.
+- **`README.md`.** The site address in the first line, the dataset link, and the "Open an issue" link at the bottom still name the current owner. They match the defaults in `config.py` and work today. Swap them by hand.
+- **The Cloudflare side.** The Pages project itself and its custom domain are set up in Cloudflare, not in this repo. I couldn't see them from here.
+- **The Hugging Face dataset.** A new, empty dataset is fine: the first daily publish creates the repo if it's missing and treats a missing table as empty. It then holds only the last 400 days of records (what `data/documents.csv` has), and the card says so. For the full history, run the backfill below and publish once with `--history`.
 
 If you set the three variables in the workflow's `env:` block, the dataset card and site pick them up. If you only change the defaults in `config.py`, you don't need to.
 
@@ -94,4 +95,4 @@ A failed run shows as a red X in the Actions tab. GitHub's own failure emails go
 
 ## What I didn't check
 
-I haven't run the workflow, the deploy or a Hugging Face publish. The tests and the output comparison are local only, and nothing here was pushed.
+I haven't run the workflow, the deploy or a Hugging Face publish. The first-publish path (missing repo, or a repo with no table) is covered by tests that fake Hugging Face; it hasn't touched the real service. The tests and the output comparison are local only, and nothing here was pushed.

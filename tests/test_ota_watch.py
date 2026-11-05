@@ -147,3 +147,80 @@ def test_timestamped_first_seen_between_issues_is_not_lost():
         ("monday", "2026-10-26T12:05:00+00:00"), ("baseline", "baseline")]}
     got = digest.select(docs, after="2026-10-22T12:31:31+00:00", until="2026-10-26T12:30:00+00:00")
     assert sorted(r["key"] for r in got) == ["monday", "same_day_after"]
+
+
+# --- first publish to a new or empty dataset (no network; HF is faked) ---
+
+class FakeHf:
+    """Stands in for HfApi plus hf_hub_download. `files` is what the dataset holds."""
+
+    def __init__(self, files=None, repo_exists=True):
+        self.files, self.repo_exists, self.calls, self.commits = files, repo_exists, [], []
+
+    def create_repo(self, repo_id, repo_type, exist_ok):
+        assert exist_ok is True
+        self.calls.append("create_repo")
+        self.repo_exists = True
+
+    def download(self, repo_id, filename, repo_type):
+        from huggingface_hub.errors import EntryNotFoundError
+        self.calls.append("download")
+        assert self.repo_exists, "downloaded before the repo was created"
+        if filename not in (self.files or {}):
+            raise EntryNotFoundError(f"{filename} not in {repo_id}")
+        return self.files[filename]
+
+    def create_commit(self, repo_id, repo_type, commit_message, operations):
+        self.commits.append((commit_message, {o.path_in_repo: o.path_or_fileobj for o in operations}))
+
+
+def _parquet(tmp_path, keys):
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+    from ota_watch import hf
+    rows = [{c: None for c in hf.COLUMNS} | doc(k) for k in keys]
+    schema = pa.schema([(c, pa.float64() if c in hf.MONEY else pa.string()) for c in hf.COLUMNS])
+    path = tmp_path / "t.parquet"
+    pq.write_table(pa.Table.from_pylist(rows, schema=schema), path)
+    return str(path)
+
+
+def test_current_rows_creates_repo_then_reads_existing_table(tmp_path):
+    from ota_watch import hf
+    fake = FakeHf({hf.PARQUET: _parquet(tmp_path, ["A", "B"])}, repo_exists=False)
+    rows = hf.current_rows(fake, fake.download)
+    assert fake.calls == ["create_repo", "download"]
+    assert sorted(r["key"] for r in rows) == ["A", "B"]
+
+
+@pytest.mark.parametrize("repo_exists", [False, True])
+def test_current_rows_empty_when_no_table_yet(repo_exists):
+    from ota_watch import hf
+    fake = FakeHf({}, repo_exists=repo_exists)  # brand-new repo, or a repo with no table in it
+    assert hf.current_rows(fake, fake.download) == []
+    assert fake.calls == ["create_repo", "download"]
+
+
+def test_publish_to_an_empty_dataset(tmp_path, monkeypatch):
+    import huggingface_hub
+    from ota_watch import hf
+    fake = FakeHf({}, repo_exists=False)
+    monkeypatch.setattr(huggingface_hub, "HfApi", lambda: fake)
+    monkeypatch.setattr(huggingface_hub, "hf_hub_download", fake.download)
+    monkeypatch.setattr(hf.collect, "load", lambda *a, **k: {"A": doc("A"), "B": doc("B")})
+    hf.publish(None)
+    assert fake.calls == ["create_repo", "download", "create_repo"]  # second is the commit's own exist_ok call
+    (message, files), = fake.commits
+    assert set(files) == {hf.PARQUET, hf.CSV, "README.md"} and "2 documents" in message
+
+
+def test_publish_to_an_existing_dataset_keeps_its_rows(tmp_path, monkeypatch):
+    import huggingface_hub
+    from ota_watch import hf
+    fake = FakeHf({hf.PARQUET: _parquet(tmp_path, ["OLD"])})
+    monkeypatch.setattr(huggingface_hub, "HfApi", lambda: fake)
+    monkeypatch.setattr(huggingface_hub, "hf_hub_download", fake.download)
+    monkeypatch.setattr(hf.collect, "load", lambda *a, **k: {"A": doc("A")})
+    hf.publish(None)
+    (message, _), = fake.commits
+    assert "2 documents" in message  # OLD from the dataset + A from documents.csv

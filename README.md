@@ -1,5 +1,7 @@
 # OTA Watch
 
+<!-- The site, dataset and issues links in this file match the defaults in ota_watch/config.py. A new owner swaps them by hand (see HANDOFF.md). -->
+
 **https://ota-watch.abigailhaddad.com**: every federal Other Transaction (OT) award record newly public in
 FPDS, listed weekly, with the most remarkable few picked out and summarized by Claude.
 
