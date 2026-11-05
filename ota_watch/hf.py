@@ -1,7 +1,7 @@
 """Every OT document FPDS has ever made public, on Hugging Face.
 
 data/documents.csv (the weekly site's table) only covers documents signed in
-the last collect.LOOKBACK_DAYS. The Hugging Face dataset abigailhaddad/ota-watch holds
+the last collect.LOOKBACK_DAYS. The Hugging Face dataset (config.HF_REPO_ID) holds
 all of them.
 
 Two commands:
@@ -40,8 +40,9 @@ from pathlib import Path
 import requests
 
 from . import collect, fpds
+from .config import HF_REPO_ID, PROJECT_URL, SITE_HOST, SITE_URL
 
-REPO_ID = "abigailhaddad/ota-watch"
+REPO_ID = HF_REPO_ID
 PARQUET = "data/ot_documents.parquet"
 CSV = "data/ot_documents.csv"
 MONEY = {"obligated", "total_obligated_raw", "total_all_options_raw"}
@@ -247,8 +248,8 @@ configs:
 
 Every Other Transaction document FPDS's public ATOM feed returns for the query
 `AWARD_TYPE:"OTHER TRANSACTION"`: {len(rows):,} documents, signed {oldest} to {newest}.
-Built {built} by [ota-watch](https://github.com/abigailhaddad/ota-watch), which also runs the weekly
-site [ota-watch.abigailhaddad.com](https://ota-watch.abigailhaddad.com). Every count and dollar figure on
+Built {built} by [ota-watch]({PROJECT_URL}), which also runs the weekly
+site [{SITE_HOST}]({SITE_URL}). Every count and dollar figure on
 this page is computed from the table when it is built.
 
 OTs are agreements made outside the Federal Acquisition Regulation for prototypes and follow-on
@@ -313,6 +314,26 @@ Data: U.S. government data from FPDS. Code: MIT.
 """
 
 
+def current_rows(api, download) -> list[dict]:
+    """The table now on the dataset, as a list of dicts; [] if there isn't one yet.
+
+    Creates the dataset repo first if it doesn't exist, so the very first publish
+    works. A repo with no table in it (new, or its table was removed) counts as
+    empty: the publish then writes only what collect.load() has (the last
+    LOOKBACK_DAYS), and `publish --history DIR` is how to start from full history.
+    """
+    import pyarrow.parquet as pq
+    from huggingface_hub.errors import EntryNotFoundError, RepositoryNotFoundError
+
+    api.create_repo(REPO_ID, repo_type="dataset", exist_ok=True)
+    try:
+        path = download(REPO_ID, PARQUET, repo_type="dataset")
+    except (EntryNotFoundError, RepositoryNotFoundError):
+        log.info("%s has no %s yet; starting from an empty table", REPO_ID, PARQUET)
+        return []
+    return pq.read_table(path).to_pylist()
+
+
 def publish(history: Path | None) -> None:
     from huggingface_hub import HfApi, hf_hub_download
     import pyarrow as pa
@@ -322,7 +343,7 @@ def publish(history: Path | None) -> None:
     if history:
         base = load_history(history)
     else:
-        base = pq.read_table(hf_hub_download(REPO_ID, PARQUET, repo_type="dataset")).to_pylist()
+        base = current_rows(api, hf_hub_download)
     rows, counts = merge(base, collect.load())
     schema = pa.schema([(c, pa.float64() if c in MONEY else pa.string()) for c in COLUMNS])
     buf = io.BytesIO()
