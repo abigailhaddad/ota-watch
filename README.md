@@ -56,6 +56,11 @@ uv run python -m ota_watch.site --out site/dist
 HF_TOKEN=... uv run python -m ota_watch.hf publish       # update the Hugging Face dataset
 ```
 
+To refresh records signed more than 400 days ago (the daily run doesn't re-read them), or to fill a new
+dataset with the full history: `uv run python -m ota_watch.hf backfill DIR`, then
+`HF_TOKEN=... uv run python -m ota_watch.hf publish --history DIR`. The backfill reads one calendar year
+at a time into `DIR`; if it is interrupted, rerunning resumes.
+
 Spotted a wrong pick, quote or figure? [Open an issue](https://github.com/abigailhaddad/ota-watch/issues/new).
 
 Data: FPDS records are U.S. government data. Code: MIT.
