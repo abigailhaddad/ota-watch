@@ -8,7 +8,7 @@ Every federal Other Transaction (OT) record in FPDS, a weekly site that picks ou
 - Site: https://ota-watch.abigailhaddad.com
 
 ## What runs on its own
-`.github/workflows/weekly.yml` runs daily (the schedule is at the top of the file). It reads new records from FPDS, builds the weekly issue on Mondays (the only step that calls Claude), commits the data to `main`, deploys the site to Cloudflare Pages and updates the Hugging Face dataset. `tests.yml` runs the tests.
+`.github/workflows/weekly.yml` runs daily (the schedule is at the top of the file). It reads new records from FPDS, builds the weekly issue on Mondays (the only step that calls Claude), commits the data to `main`, deploys the site to Cloudflare Pages and updates the Hugging Face dataset. `tests.yml` runs the tests on pull requests and pushes to `main`.
 
 ## Secrets and variables
 Repository secrets: `HF_TOKEN` (write access to the dataset), `ANTHROPIC_API_KEY` (Monday issue), `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` (site deploy). Variables, both optional: `ANTHROPIC_WORKSPACE_ID` and `CLOUDFLARE_PROJECT` (default `ota-watch`). The weekly workflow's header comment lists the same names.
