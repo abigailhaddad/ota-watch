@@ -57,7 +57,8 @@ def test_select_by_first_seen_never_baseline_and_by_signed():
     assert [r["key"] for r in got] == ["old", "this"]
 
 
-ROWS = [doc("A", obligated=85_500_000, desc="EQUITY INVESTMENT AGREEMENT.\nAN OTHER TRANSACTION VEHICLE WAS USED"),
+ROWS = [doc("A", obligated=85_500_000, desc="EQUITY INVESTMENT AGREEMENT.\nAN OTHER TRANSACTION VEHICLE WAS USED",
+            competed="NOT COMPETED"),
         doc("B", obligated=12_457_553.78, desc="AGREEMENT/ORDER AWARDED TO OVERLAND AI\nFOR FUNDING MILESTONES"),
         doc("C", obligated=10_106_478.67, desc="AWARDED TO FORTERRA FOR FUNDING MILESTONES"),
         doc("D", obligated=-132_493, desc="PROCUREMENT AND HUSBANDRY OF NONHUMAN PRIMATES")]
@@ -91,7 +92,7 @@ def test_check_pick(p, reason):
 
 def test_build_issue_drops_bad_picks_and_computes_numbers():
     picks = [pick(), pick(quote="made up words here"), pick(indices=[1, 2], quote_index=2,
-             quote="awarded to forterra", headline="Consortium orders")]
+             quote="awarded to forterra", headline="Consortium orders", why="Two orders through a consortium.")]
     i = digest.build_issue(ROWS, picks, {"model": "m"}, date="2026-10-26", window={"kind": "first_seen"})
     assert [p["headline"] for p in i["picks"]] == ["Equity investment of $85.5M", "Consortium orders"]
     assert i["dropped"][0]["dropped_because"].startswith("quote not found")
@@ -224,3 +225,32 @@ def test_publish_to_an_existing_dataset_keeps_its_rows(tmp_path, monkeypatch):
     hf.publish(None)
     (message, _), = fake.commits
     assert "2 documents" in message  # OLD from the dataset + A from documents.csv
+
+
+# Claims checked against the records (2026-11-11 review of 20 published picks).
+WEEK = [doc("L3", obligated=280_112_426, mod="P00002", competed="COMPETED", agreement_type="PROTOTYPE"),
+        doc("X1", obligated=109_900_000, mod="P00003"),
+        doc("X2", obligated=98_227_293, action_type="OTHER TRANSACTION IDV", agreement_type="PROTOTYPE"),
+        doc("SS", obligated=64_089_693, mod="P00001", competed="COMPETED"),
+        doc("RA", obligated=59_983_313.67, action_type="OTHER TRANSACTION IDV", agreement_type="PROTOTYPE"),
+        doc("NR", obligated=22_439_201, competed="NOT COMPETED", agreement_type="PROTOTYPE")]
+
+
+@pytest.mark.parametrize("text,idx,bad", [
+    # 2026-11-02 #1: two records ranked 1st and 4th called "the largest obligations"
+    ("These are the largest obligations in this week's records.", [0, 3], "largest"),
+    ("At $280.1M it is the largest single obligation this week.", [0], None),
+    # 2026-11-02 #4: second-largest new award
+    ("It is one of the largest new awards this week.", [4], None),
+    ("A new competed OT IDV.", [4], None),
+    ("A new, not-competed prototype agreement.", [5], None),
+    ("An uncompeted award.", [3], "not competed"),
+    ("A new prototype agreement (mod 0).", [3], "new"),
+    ("A new production OT.", [4], "production"),
+    ("A new OT IDV.", [5], "IDV"),
+    ("The descriptions name IDV USA Inc. as the performer.", [5], None),     # a firm's name, not an IDV claim
+    ("It definitized a letter contract.", [5], "letter contract"),
+])
+def test_claim_problem(text, idx, bad):
+    got = digest.claim_problem(text, idx, WEEK)
+    assert (got is None) if bad is None else (got is not None and bad in got), got
