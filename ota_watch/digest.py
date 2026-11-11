@@ -149,6 +149,55 @@ def dollar_figures(text: str) -> list[tuple[float, float]]:
     return out
 
 
+# Claims about the records that the quote and dollar checks don't cover. A review of the four issues of
+# 2026-10-22 to 2026-11-09 (20 picks) found every such claim right except one rank claim: "These are the
+# largest obligations in this week's records" for two records ranked 1st and 4th (2026-11-02). Each rule
+# drops a pick only when its wording contradicts the records; it never needs the model to say anything.
+_FIELD_CLAIMS = [
+    # (wording in headline or explanation, test that at least one of the pick's records must pass, label)
+    (r"\b(?:un-?competed|not[\s-]+competed|non-?competitive|without competition)\b",
+     lambda r: (r.get("competed") or "").upper() == "NOT COMPETED", "not competed"),
+    (r"(?<!un)(?<!not )(?<!not-)\bcompeted\b",
+     lambda r: (r.get("competed") or "").upper() == "COMPETED", "competed"),
+    (r"\bnew\b(?![\s-]+(?:york|mexico|jersey|hampshire|orleans|england|zealand))", is_new, "new"),
+    (r"\bmod(?:ification)?\s+0\b", is_new, "mod 0"),
+    (r"\bproduction\s+(?:ot|ots|other transaction|agreement|order|vehicle|idv)\b",
+     lambda r: (r.get("agreement_type") or "").upper() == "PRODUCTION", "production"),
+    (r"\bprototype\s+(?:ot|ots|other transaction|agreement|order|vehicle|idv)\b",
+     lambda r: (r.get("agreement_type") or "").upper() == "PROTOTYPE", "prototype"),
+    # "an IDV", "OT IDV", "new IDV", "vehicle"; not a firm's name ("IDV USA Inc." in the 2026-10-22 issue)
+    (r"\b(?:an?|the|new|this|ot|other transaction)\s+(?:ot\s+)?idvs?\b|\bvehicles?\b",
+     lambda r: "IDV" in (r.get("action_type") or "").upper(), "IDV"),
+    (r"\bletter contract|\bdefinitiz", lambda r: "LETTER" in (r.get("mod_reason") or "").upper(), "letter contract"),
+    (r"\bfunding[\s-]+only\b", lambda r: "FUNDING ONLY" in (r.get("mod_reason") or "").upper(), "funding-only"),
+]
+_RANK = re.compile(r"\b(one of the\s+)?(?:largest|biggest)\b(?:\s+single)?(\s+new)?\s*(\w+)?", re.I)
+
+
+def claim_problem(text: str, idx: list[int], rows: list[dict]) -> str | None:
+    """A claim in the pick's text that its records, or the week's records, contradict; or None."""
+    picked = [rows[i] for i in idx]
+    for rx, ok, label in _FIELD_CLAIMS:
+        if re.search(rx, text, re.I) and not any(ok(r) for r in picked):
+            return f"says {label!r} but none of its records is"
+    for m in _RANK.finditer(text):
+        pool = [r for r in rows if is_new(r)] if m.group(2) else rows
+        ranked = sorted((abs(_f(r.get("obligated"))) for r in pool), reverse=True)
+        mine = sorted((abs(_f(r.get("obligated"))) for r in picked if (is_new(r) or not m.group(2))), reverse=True)
+        if not mine or not ranked:
+            return "rank claim with no matching record"
+        if m.group(1):                                   # "one of the largest": the pick's biggest is top 5
+            if mine[0] < ranked[min(4, len(ranked) - 1)]:
+                return "says 'one of the largest' but it is not in the week's top 5"
+        else:
+            plural = (m.group(3) or "").lower().endswith("s") and len(mine) > 1
+            need = mine if plural else mine[:1]          # "the largest obligations": every one is top-N
+            top = ranked[:len(need)]
+            if any(x < top[-1] for x in need):
+                return "says 'largest' but the week's records have larger ones"
+    return None
+
+
 def check_pick(p: dict, rows: list[dict]) -> str | None:
     """Why the pick must be dropped, or None."""
     idx = p.get("indices") or []
@@ -166,7 +215,7 @@ def check_pick(p: dict, rows: list[dict]) -> str | None:
     for val, tol in dollar_figures(f"{p.get('headline')} {p.get('why')}"):
         if not any(abs(val - a) <= tol for a in allowed):
             return f"dollar figure {val:,.0f} is not a record's obligation or their sum"
-    return None
+    return claim_problem(f"{p.get('headline')} {p.get('why')}", idx, rows)
 
 
 def summarize(rows: list[dict]) -> dict:
