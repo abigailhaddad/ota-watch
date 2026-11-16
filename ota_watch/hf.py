@@ -220,7 +220,8 @@ def _quantiles(xs: list[int]) -> dict | None:
     return {"n": len(xs), "p10": at(0.1), "p50": at(0.5), "p90": at(0.9)}
 
 
-def card(rows: list[dict], built: str) -> str:
+def card(rows: list[dict], built: str, dictionary: str = "") -> str:
+    """The dataset card. `dictionary` is the data dictionary section from ota_watch/data_docs.py."""
     st = stats(rows)
     kinds = collections.Counter(r["kind"] for r in rows)
     newest = max((r["signed"] for r in rows if r["signed"]), default="")
@@ -310,8 +311,25 @@ unique per document (`kind|agency_id|piid|mod|parent_piid`; order PIIDs repeat a
   showed them when the history was last read in full (`python -m ota_watch.hf backfill`).
 * Only what FPDS's public feed shows. An OT never reported to FPDS is not here.
 
+{dictionary}
 Data: U.S. government data from FPDS. Code: MIT.
 """
+
+
+def data_dictionary(parquet: bytes) -> str:
+    """The data dictionary section for the card, from the table about to be uploaded and docs/tables.toml.
+    Stops (SystemExit) if the table's columns no longer match the descriptions."""
+    import sys
+    import tempfile
+
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import data_docs
+
+    with tempfile.TemporaryDirectory() as d:
+        p = Path(d) / PARQUET
+        p.parent.mkdir(parents=True)
+        p.write_bytes(parquet)
+        return data_docs.markdown(d, level=2, source="the file in this dataset")
 
 
 def current_rows(api, download) -> list[dict]:
@@ -354,12 +372,13 @@ def publish(history: Path | None) -> None:
     for r in rows:
         w.writerow({c: "" if r[c] is None else r[c] for c in COLUMNS})
     built = dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat()
+    dictionary = data_dictionary(buf.getvalue())
     from huggingface_hub import CommitOperationAdd
     api.create_repo(REPO_ID, repo_type="dataset", exist_ok=True)
     api.create_commit(REPO_ID, repo_type="dataset", commit_message=f"Update {built}: {len(rows):,} documents",
                       operations=[CommitOperationAdd(PARQUET, buf.getvalue()),
                                   CommitOperationAdd(CSV, sbuf.getvalue().encode("utf-8")),
-                                  CommitOperationAdd("README.md", card(rows, built).encode("utf-8"))])
+                                  CommitOperationAdd("README.md", card(rows, built, dictionary).encode("utf-8"))])
     print(json.dumps(counts))
 
 

@@ -61,6 +61,21 @@ dataset with the full history: `uv run python -m ota_watch.hf backfill DIR`, the
 `HF_TOKEN=... uv run python -m ota_watch.hf publish --history DIR`. The backfill reads one calendar year
 at a time into `DIR`; if it is interrupted, rerunning resumes.
 
+## Data dictionary
+
+[`docs/data_dictionary.md`](docs/data_dictionary.md) lists every column of the Hugging Face table with its type, a description, the share of rows that have a value, and an example. Types, counts and examples are read from the published parquet files; descriptions are in [`docs/tables.toml`](docs/tables.toml), written from the code that builds each column (`ota_watch/fpds.py` names the FPDS element behind each one). Regenerate it with
+
+    uv run python ota_watch/data_docs.py fetch hf_data   # download the current table from Hugging Face
+    uv run python ota_watch/data_docs.py write hf_data   # write docs/data_dictionary.md
+
+`ota_watch/hf.py` puts the same section on the Hugging Face dataset card. `ota_watch/data_docs.py` stops with an error (and so does `ota_watch.hf publish`, before uploading) if a parquet column has no description in `docs/tables.toml` or a described column is gone, and the daily workflow runs that check too.
+
+## SQLite download
+
+The daily workflow builds `ota-watch.sqlite` from the files on Hugging Face (table `ot_documents`, plus `_source`, which records the Hugging Face commit) and attaches it to the GitHub release [`latest-data`](https://github.com/abigailhaddad/ota-watch/releases/tag/latest-data). The release is replaced whenever the Hugging Face commit changes. To build it yourself:
+
+    uv run python ota_watch/build_sqlite.py hf_data ota-watch.sqlite
+
 Spotted a wrong pick, quote or figure? [Open an issue](https://github.com/abigailhaddad/ota-watch/issues/new).
 
 Data: FPDS records are U.S. government data. Code: MIT.
