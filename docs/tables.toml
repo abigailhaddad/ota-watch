@@ -1,0 +1,59 @@
+# Column descriptions for the published table. ota_watch/data_docs.py reads this file and the parquet file
+# and writes docs/data_dictionary.md; it stops with an error if a parquet column is missing here or a column
+# here is not in the parquet, so the dictionary can't drift from the schema.
+#
+# Each description comes from the code that builds the column (ota_watch/fpds.py parse_entry, which names
+# the FPDS ATOM element each column is read from; ota_watch/collect.py; ota_watch/hf.py) and the caveats on
+# the dataset card. A column listed in `unconfirmed` is one whose meaning the source doesn't define; the
+# dictionary marks it.
+#
+# Every column is text except the three dollar columns. data/ot_documents.csv on Hugging Face has the same
+# columns.
+
+dataset = "abigailhaddad/ota-watch"
+
+[tables.ot_documents]
+file = "data/ot_documents.parquet"
+config = "default"
+grain = "One row per Other Transaction document (a base award or a modification) that FPDS's public ATOM feed returns for AWARD_TYPE:\"OTHER TRANSACTION\"."
+primary_key = "key"
+
+[tables.ot_documents.columns]
+first_seen = "When ota-watch's daily collection first saw the document in FPDS (UTC, ISO 8601). `baseline` means it was already public when the project started, or was signed before the collection's 400-day window. Not when FPDS published it."
+key = "Unique document key: `kind|agency_id|piid|mod|parent_piid` (`mod` is `0` for a base document; order PIIDs repeat across parent IDVs, so the parent is part of the key)."
+kind = "FPDS document type: `OtherTransactionAward` (an agreement, or an order under an OT IDV) or `OtherTransactionIDV` (the parent vehicle)."
+action_type = "FPDS contractActionType description: `OTHER TRANSACTION AGREEMENT`, `OTHER TRANSACTION ORDER` or `OTHER TRANSACTION IDV`."
+agency_id = "FPDS agencyID of the document's ID (the contracting agency code, e.g. `9700` Defense, `7013` TSA)."
+piid = "FPDS PIID: the agreement, order or IDV number."
+mod = "FPDS modNumber; `0` for the base document."
+parent_agency_id = "Orders only: agencyID of the referenced IDV."
+parent_piid = "Orders only: PIID of the referenced IDV (the vehicle the order is placed under)."
+signed = "FPDS signedDate, YYYY-MM-DD."
+effective = "FPDS effectiveDate, YYYY-MM-DD."
+completion = "FPDS currentCompletionDate, YYYY-MM-DD."
+fiscal_year = "FPDS fiscalYear of the action, as given."
+obligated = "FPDS obligatedAmount: dollars obligated by this one action. Can be negative (deobligations). The dollar column to use."
+total_obligated_raw = "FPDS totalObligatedAmount as given. On OT records it disagrees with `total_all_options_raw` and along a record chain; kept raw, not used."
+total_all_options_raw = "FPDS totalBaseAndAllOptionsValue as given. Unreliable on OT records for the same reason; kept raw, not used."
+agreement_type = "FPDS typeOfAgreement: `PROTOTYPE` or `PRODUCTION`. PRODUCTION does not appear before a certain fiscal year (see the card); whether earlier PROTOTYPE values were recorded or defaulted isn't known."
+mod_reason = "FPDS reasonForModification description (e.g. `FUNDING ONLY ACTION`). Null on base documents (and a few modifications)."
+description = "FPDS descriptionOfContractRequirement, as entered."
+nontraditional = "FPDS nonTraditionalGovernmentContractorParticipation description (e.g. `NONTRADITIONAL SIGNIFICANT PARTICIPATION`, `COST SHARING`)."
+competed = "FPDS competition extentCompeted description: `COMPETED` or `NOT COMPETED`."
+solicitation = "FPDS competition solicitationProcedures description (e.g. `PROGRAM SOLICITATION`, `BROAD AGENCY ANNOUNCEMENT`, `ONLY ONE SOURCE`)."
+department = "Department name of the contracting office's agency (FPDS contractingOfficeAgencyID departmentName)."
+contracting_agency = "Name of the contracting office's agency (FPDS contractingOfficeAgencyID name)."
+contracting_office_id = "FPDS contractingOfficeID code."
+contracting_office = "Name of the contracting office (FPDS contractingOfficeID name)."
+funding_agency = "Name of the funding or requesting agency (FPDS fundingRequestingAgencyID name)."
+funding_office = "Name of the funding or requesting office (FPDS fundingRequestingOfficeID name)."
+vendor = "FPDS vendorName as entered. Often a consortium or the organization that manages one, not the firm doing the work. Names vary for one UEI; group by `uei`."
+uei = "Vendor's Unique Entity ID (FPDS vendorUEIInformation UEI)."
+parent_uei = "UEI of the vendor's ultimate parent (FPDS ultimateParentUEI)."
+parent_name = "Name of the vendor's ultimate parent (FPDS ultimateParentUEIName)."
+consortium = "FPDS consortiaFlag: `Y` or `N`. Filled in only from a certain fiscal year on (see the card); null before then means unknown, not no."
+psc = "Product or Service Code (FPDS PSCCode)."
+psc_desc = "Description of the PSC, from FPDS."
+created = "When the record was created in FPDS (transactionInformation createdDate), as given."
+last_modified = "When the record was last modified in FPDS (transactionInformation lastModifiedDate), as given."
+fpds_link = "Link to the document's search result on fpds.gov, from the feed entry."

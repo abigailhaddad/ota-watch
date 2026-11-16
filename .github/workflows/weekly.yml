@@ -76,3 +76,22 @@ jobs:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           HF_HUB_DISABLE_PROGRESS_BARS: "1"
         run: uv run python -m ota_watch.hf publish
+
+      # Downloadable SQLite: download what is now on Hugging Face, stop if its columns no longer match
+      # docs/tables.toml, build one SQLite file and attach it to the GitHub release `latest-data`. The release
+      # is deleted and recreated whenever the Hugging Face commit changes, so it always holds one file.
+      - name: SQLite file on the latest-data release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          uv run python ota_watch/data_docs.py fetch hf_data
+          uv run python ota_watch/data_docs.py check hf_data
+          sha=$(cat hf_data/REVISION)
+          if gh release view latest-data --json body --jq .body 2>/dev/null | grep -q "$sha"; then
+            echo "latest-data already holds Hugging Face commit $sha; nothing to do"
+            exit 0
+          fi
+          built=$(uv run python ota_watch/build_sqlite.py hf_data ota-watch.sqlite | tail -n 1)
+          echo "$built"
+          gh release delete latest-data --cleanup-tag --yes 2>/dev/null || true
+          gh release create latest-data ota-watch.sqlite --title "Latest data (SQLite)" --notes "SQLite copy of https://huggingface.co/datasets/abigailhaddad/ota-watch at commit $sha, built $(date -u +%Y-%m-%d) by the daily OTA Watch workflow. One table, ot_documents; columns are described in docs/data_dictionary.md. ${built#wrote }"
