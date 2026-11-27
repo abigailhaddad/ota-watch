@@ -27,6 +27,7 @@ from pathlib import Path
 
 from .config import DATASET_URL, GITHUB_REPO, HF_REPO_ID, ISSUE_URL, PROJECT_URL, SITE_URL
 from .digest import ISSUES, MAX_PICKS, money
+from .opening import kept_text
 
 TITLE = "OTA Watch"
 TAGLINE = ("Federal Other Transaction (OT) awards newly public in FPDS, all listed each week, "
@@ -155,13 +156,15 @@ def window_label(issue: dict) -> str:
 
 def issue_content(issue: dict) -> str:
     s = issue["summary"]
-    parts = [f'<p class="lede">{e(window_label(issue))}</p>',
-             f'<p>{s["records"]:,} records: {s["new_awards"]:,} new agreements, orders or vehicles '
-             f'({s["new_not_competed"]:,} not competed; {e(money(s["obligated_new"]))} obligated on them) and '
-             f'{s["modifications"]:,} modifications. {e(money(s["obligated_all"]))} obligated across all records.</p>']
+    lead = kept_text(issue)   # the checked opening (opening.py), if it passed
+    parts = ([f'<p class="lede opening">{e(lead)}</p>'] if lead else []) + [f'<p class="lede">{e(window_label(issue))}</p>']
     if not issue["picks"]:
         parts.append("<p>Nothing picked out this week.</p>")
     parts += [pick_html(i, p) for i, p in enumerate(issue["picks"], 1)]
+    # the week's counts come after the picks, with the full lists they describe
+    parts.append(f'<p>{s["records"]:,} records: {s["new_awards"]:,} new agreements, orders or vehicles '
+                 f'({s["new_not_competed"]:,} not competed; {e(money(s["obligated_new"]))} obligated on them) and '
+                 f'{s["modifications"]:,} modifications. {e(money(s["obligated_all"]))} obligated across all records.</p>')
     new = [r for r in issue["records"] if (r.get("mod") or "0") == "0"]
     mods = [r for r in issue["records"] if (r.get("mod") or "0") != "0"]
     parts.append(f'<section class="all"><h2>All new agreements, orders and vehicles ({len(new)})</h2>'
