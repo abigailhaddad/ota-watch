@@ -121,7 +121,8 @@ def test_site_escapes_and_has_no_scripts(tmp_path):
                            window={"kind": "first_seen", "first_seen_after": "2026-10-19", "first_seen_to": "2026-10-26"})
     out = tmp_path / "dist"
     files = site.build([i], out)
-    assert files == ["404.html", "about.html", "feed.xml", "index.html", "issues/2026-10-26.html", "style.css"]
+    assert files == ["404.html", "about.html", "feed.xml", "index.html", "issues/2026-10-26-all.html",
+                     "issues/2026-10-26.html", "style.css"]
     for f in files:
         t = (out / f).read_text()
         assert "<script" not in t and "javascript:" not in t, f

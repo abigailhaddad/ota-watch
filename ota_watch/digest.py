@@ -23,6 +23,9 @@ What code does, and checks:
   not one of its records' obligations or their sum (within rounding);
 * dollars are obligations on each action, never FPDS's "total" fields.
 
+A second call writes the short opening on what the week's new agreements are for (opening.py), checked
+sentence by sentence against the records it cites; it is left out if any check fails.
+
 One issue per calendar week (Monday-Sunday): refuses to build one if the
 newest issue is in the same week, so a rerun or a late cron does nothing.
 
@@ -323,10 +326,15 @@ def main(argv=None, client=None) -> int:
               {"kind": "first_seen", "first_seen_after": after, "first_seen_to": cutoff})
     picks, usage = call_model(rows, client) if rows else ([], {})
     issue = build_issue(rows, picks, usage, date=date, window=window)
+    # The written opening: a second, smaller call, checked sentence by sentence in code (opening.py). It never
+    # raises; a failed check leaves the opening out of the page, and the reasons in the issue file.
+    from . import opening
+    issue["opening"] = opening.write(issue, client) if rows else None
     print(json.dumps({k: issue[k] for k in ("date", "window", "summary")} | {
         "picks": [p["headline"] for p in issue["picks"]],
-        "dropped": [(d["headline"], d["dropped_because"]) for d in issue["dropped"]], "usage": usage},
-        indent=1), file=sys.stderr)
+        "dropped": [(d["headline"], d["dropped_because"]) for d in issue["dropped"]], "usage": usage,
+        "opening": {k: (issue["opening"] or {}).get(k) for k in ("status", "text", "problems")}},
+        indent=1, ensure_ascii=False), file=sys.stderr)
     if not a.dry_run:
         ISSUES.mkdir(parents=True, exist_ok=True)
         path = ISSUES / f"{date}.json"
