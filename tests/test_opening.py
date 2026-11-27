@@ -142,3 +142,29 @@ def test_digest_main_adds_the_opening_and_never_fails_on_it(tmp_path, monkeypatc
         "now": classmethod(lambda cls, tz=None: digest.dt.datetime(2099, 1, 2, tzinfo=digest.dt.timezone.utc))}))
     digest.main(["--date", "2026-11-23", "--dry-run"], client=SimpleNamespace(messages=SimpleNamespace(create=create)))
     assert len(calls) == 2 and '"opening"' in capsys.readouterr().err
+
+
+def test_issue_page_lists_the_top_new_records_and_links_every_record():
+    # 2026-11-27: the issue page lists the WEEK_TOP largest new records not in a pick; the rest, and every
+    # modification, are on the week's every-record page, and the page says how many it left out
+    top, rest, mods = site.week_lists(ISSUE)
+    new = [r for r in ISSUE["records"] if (r.get("mod") or "0") == "0"]
+    in_picks = {(r["piid"], r["mod"]) for p in ISSUE["picks"] for r in p["records"]}
+    assert len(top) == site.WEEK_TOP and not any((r["piid"], r["mod"]) in in_picks for r in top)
+    assert len(top) + rest + sum(1 for r in new if (r["piid"], r["mod"]) in in_picks) == len(new)
+    others = [abs(r["obligated"]) for r in new if (r["piid"], r["mod"]) not in in_picks]
+    assert [abs(r["obligated"]) for r in top] == sorted(others, reverse=True)[:site.WEEK_TOP]
+    html = site.issue_content(ISSUE)
+    assert f"Not listed here: {rest:,} more new agreements, orders and vehicles and {len(mods):,} modifications" in html
+    assert 'href="2026-11-16-all.html"' in html and "All modifications" not in html
+    full = site.all_records_content(ISSUE)
+    assert full.count("<li>") == len(ISSUE["records"])
+
+
+def test_a_large_grouped_pick_names_its_records_and_lists_them_on_the_every_record_page():
+    big = next(p for p in ISSUE["picks"] if len(p["records"]) > site.GROUP_LIST_MAX)
+    h = site.pick_html(1, big, ISSUE["date"])
+    assert "<li>" not in h and 'href="2026-11-16-all.html"' in h
+    assert all(r["piid"] in h for r in big["records"])
+    small = next(p for p in ISSUE["picks"] if len(p["records"]) == 2)
+    assert site.pick_html(1, small, ISSUE["date"]).count("<li>") == 2

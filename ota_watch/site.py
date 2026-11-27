@@ -119,7 +119,10 @@ def record_ref(r: dict) -> str:
             f"{e(money(r.get('obligated')))} obligated on this action ({link(source_url(r), 'FPDS record, XML')})")
 
 
-def pick_html(n: int, p: dict) -> str:
+GROUP_LIST_MAX = 3  # a pick with more records than this lists them on the every-record page, not the issue page
+
+
+def pick_html(n: int, p: dict, date: str | None = None) -> str:
     recs = p["records"]
     out = [f'<article class="pick"><h2><span class="rank">{n}.</span> {e(p["headline"])}</h2>',
            f'<p class="facts">{shared_facts(recs)}</p>',
@@ -127,18 +130,23 @@ def pick_html(n: int, p: dict) -> str:
            f'<blockquote><p>“{e(p["quote"])}”</p><footer>— FPDS description, {e(p["quote_piid"])}</footer></blockquote>']
     if len(recs) == 1:
         out.append(f'<p class="meta">{record_ref(recs[0])}</p>')
-    else:
+    elif len(recs) <= GROUP_LIST_MAX:
         items = "".join(f"<li>{e(r.get('vendor'))}: {record_ref(r)}</li>" for r in recs)
         out.append(f'<p class="meta">{len(recs)} records, {e(money(p["obligated_total"]))} obligated in all:</p>'
                    f'<ul class="meta">{items}</ul>')
+    else:   # a large group: its records, each with its FPDS link, are on the week's every-record page
+        piids = ", ".join(e(r.get("piid")) for r in recs)
+        out.append(f'<p class="meta">{len(recs)} records, {e(money(p["obligated_total"]))} obligated in all: {piids}. '
+                   f'Each is on <a href="{e(date)}-all.html">the every-record page</a>.</p>' if date else
+                   f'<p class="meta">{len(recs)} records, {e(money(p["obligated_total"]))} obligated in all: {piids}.</p>')
     out.append("</article>")
     return "\n".join(out)
 
 
-def row_html(r: dict) -> str:
+def row_html(r: dict, desc_chars: int = 220) -> str:
     desc = re.sub(r"\s+", " ", r.get("description") or "").strip()
-    if len(desc) > 220:
-        desc = desc[:217] + "..."
+    if len(desc) > desc_chars:
+        desc = desc[:desc_chars - 3] + "..."
     return (f"<li>{facts_line(r)}<br>{record_ref(r)}"
             + (f'<br><span class="gist">{e(desc)}</span>' if desc else "") + "</li>")
 
@@ -160,22 +168,61 @@ def issue_content(issue: dict) -> str:
     parts = ([f'<p class="lede opening">{e(lead)}</p>'] if lead else []) + [f'<p class="lede">{e(window_label(issue))}</p>']
     if not issue["picks"]:
         parts.append("<p>Nothing picked out this week.</p>")
-    parts += [pick_html(i, p) for i, p in enumerate(issue["picks"], 1)]
+    parts += [pick_html(i, p, issue["date"]) for i, p in enumerate(issue["picks"], 1)]
     # the week's counts come after the picks, with the full lists they describe
     parts.append(f'<p>{s["records"]:,} records: {s["new_awards"]:,} new agreements, orders or vehicles '
                  f'({s["new_not_competed"]:,} not competed; {e(money(s["obligated_new"]))} obligated on them) and '
                  f'{s["modifications"]:,} modifications. {e(money(s["obligated_all"]))} obligated across all records.</p>')
-    new = [r for r in issue["records"] if (r.get("mod") or "0") == "0"]
-    mods = [r for r in issue["records"] if (r.get("mod") or "0") != "0"]
-    parts.append(f'<section class="all"><h2>All new agreements, orders and vehicles ({len(new)})</h2>'
-                 + ("<ul>" + "".join(row_html(r) for r in new) + "</ul>" if new else "<p>None.</p>")
-                 + "</section>")
+    top, rest_new, mods = week_lists(issue)
+    if top:
+        parts.append(f'<section class="all"><h2>The {len(top)} largest other new agreements, orders and vehicles</h2>'
+                     '<p class="note">By money obligated, leaving out records in the picks above.</p>'
+                     "<ul>" + "".join(row_html(r, SHORT_DESC) for r in top) + "</ul></section>")
+    parts.append(f'<p class="note">Not listed here: {rest_new:,} more new agreements, orders and vehicles and '
+                 f'{len(mods):,} modifications. <a href="{e(issue["date"])}-all.html">Every record this week</a>, '
+                 "largest first. Dollar amounts are the money obligated by each action; FPDS's \"total value\" fields "
+                 "on OT records are unreliable and are not used.</p>")
+    return "\n".join(parts)
+
+
+WEEK_TOP = 5       # the issue page lists this many new records (largest obligation first, picks left out)
+SHORT_DESC = 120   # ... with their description cut at this length; the all-records page has 220
+
+
+def _is_new(r: dict) -> bool:
+    return (r.get("mod") or "0") == "0"
+
+
+def week_lists(issue: dict) -> tuple[list[dict], int, list[dict]]:
+    """(the new records the issue page lists, how many other new records it leaves out, the modifications).
+    Records in a pick are not listed again. issue["records"] is already sorted new first, largest first."""
+    key = lambda r: (r.get("piid"), r.get("mod"), r.get("parent_piid"))  # noqa: E731
+    picked = {key(r) for p in issue.get("picks") or [] for r in p["records"]}
+    new = [r for r in issue["records"] if _is_new(r)]
+    others = sorted((r for r in new if key(r) not in picked), key=lambda r: -abs(r.get("obligated") or 0))
+    mods = [r for r in issue["records"] if not _is_new(r)]
+    return others[:WEEK_TOP], len(others) - len(others[:WEEK_TOP]), mods
+
+
+def all_records_content(issue: dict) -> str:
+    new = [r for r in issue["records"] if _is_new(r)]
+    mods = [r for r in issue["records"] if not _is_new(r)]
+    parts = [f'<p class="lede">{e(window_label(issue))}</p>',
+             f'<section class="all"><h2>All new agreements, orders and vehicles ({len(new)})</h2>'
+             + ("<ul>" + "".join(row_html(r) for r in new) + "</ul>" if new else "<p>None.</p>") + "</section>"]
     if mods:
-        parts.append(f'<section class="all"><details><summary><h2>All modifications ({len(mods)})</h2></summary>'
-                     + "<ul>" + "".join(row_html(r) for r in mods) + "</ul></details></section>")
+        parts.append(f'<section class="all"><h2>All modifications ({len(mods)})</h2>'
+                     + "<ul>" + "".join(row_html(r) for r in mods) + "</ul></section>")
     parts.append('<p class="note">Dollar amounts are the money obligated by each action. FPDS\'s "total value" '
                  "fields on OT records are unreliable and are not used. Records are sorted by size within each list.</p>")
     return "\n".join(parts)
+
+
+def all_records_page(issue: dict) -> str:
+    d = issue["date"]
+    body = (f'<p class="dateline"><a href="{e(d)}.html">← {e(TITLE)}: week of {e(date_label(d))}</a></p>'
+            f'<h1>Every record, week of {e(date_label(d))}</h1>\n' + all_records_content(issue))
+    return page(f"{TITLE}: every record, {date_label(d)}", body, root="../")
 
 
 def issue_page(issue: dict, prev: str | None, nxt: str | None) -> str:
@@ -206,7 +253,10 @@ Regulation for prototypes and their follow-on production. They are reported to
 FPDS, the federal procurement database, but not to USAspending.</p>
 <p><strong>What each week has.</strong> Every OT record that first appeared in FPDS since the previous week:
 new agreements, orders and vehicles, and modifications. Each record is one action, and its dollar amount is what
-that action obligated. Claude reads them all and picks out a few (at most {MAX_PICKS}, sometimes none).</p>
+that action obligated. Claude reads them all and picks out a few (at most {MAX_PICKS}, sometimes none). The issue
+page then lists the {WEEK_TOP} other new agreements, orders and vehicles with the largest obligations; every record
+of the week, modifications included, is on that week's "every record" page. A pick that groups more than
+{GROUP_LIST_MAX} records names them by award number and lists them there.</p>
 <p><strong>The Defense delay.</strong> Defense records become public in FPDS months after they are signed, and
 some are entered later still, so most of each week's Defense records were signed months before. Other agencies'
 records can appear sooner. The <a href="{e(DATASET_URL)}">dataset card</a> gives the delay measured from the
@@ -295,6 +345,7 @@ def build(issues: list[dict], out: Path) -> list[str]:
         prev = issues[k - 1]["date"] if k > 0 else None
         nxt = issues[k + 1]["date"] if k + 1 < len(issues) else None
         files[f"issues/{i['date']}.html"] = issue_page(i, prev, nxt)
+        files[f"issues/{i['date']}-all.html"] = all_records_page(i)
     for rel, text in files.items():
         (out / rel).write_text(text, encoding="utf-8")
     return sorted(files)
