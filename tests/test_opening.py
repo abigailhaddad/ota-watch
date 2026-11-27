@@ -168,3 +168,11 @@ def test_a_large_grouped_pick_names_its_records_and_lists_them_on_the_every_reco
     assert all(r["piid"] in h for r in big["records"])
     small = next(p for p in ISSUE["picks"] if len(p["records"]) == 2)
     assert site.pick_html(1, small, ISSUE["date"]).count("<li>") == 2
+
+
+def test_prompt_carries_the_light_voice_and_announcing_oddness_is_refused():
+    assert "dry and a little wry" in opening.PROMPT.format(facts="{}", voice=opening.VOICE)
+    assert "at most one wry turn" in opening.VOICE
+    s = [{"text": "Curiously, Chariot Defense received the PRISM prototype award.",
+          "sources": [{"record": rid(PRISM), "quote": "PORTABLE RESILIENT INTEGRATED STORAGE MODULE (PRISM) PROTOTYPE"}]}]
+    assert any("hype word: 'Curiously'" in x for x in run(s))

@@ -105,6 +105,12 @@ SCHEMA = {
     "required": ["sentences"], "additionalProperties": False,
 }
 
+# The newsletter's voice (wording from usajobs-weekly's llm.VOICE), set per topic.
+VOICE = ("Voice: dry and a little wry, like a colleague who reads every record and points out the good bits. "
+         "Short declarative sentences. Let the record be the joke by describing it exactly; never announce that "
+         "something is funny or odd. No puns, no exclamation marks, and no mocking the people involved. Keep it light: mostly plain, with at most one wry turn.")
+
+
 PROMPT = """You write the opening paragraph of a weekly page about federal Other Transaction (OT) agreements
 newly public in FPDS. Defense OT records become public about 90 days after signing. Readers track federal
 spending: reporters, congressional staff, lawyers. Below the paragraph the page already has a few picked-out
@@ -132,6 +138,8 @@ For each sentence give its text and its sources: the id of every record it draws
 quote copied character for character from that record's description (at least three words) that the sentence
 rests on.
 
+{voice}
+
 This week:
 {facts}
 """
@@ -145,7 +153,7 @@ def call_model(ftext: str, client=None) -> tuple[list[dict], dict]:
         if os.environ.get("ANTHROPIC_WORKSPACE_ID") else None)
     r = c.messages.create(model=MODEL, max_tokens=4000,
                           output_config={"format": {"type": "json_schema", "schema": SCHEMA}},
-                          messages=[{"role": "user", "content": PROMPT.format(facts=ftext)}])
+                          messages=[{"role": "user", "content": PROMPT.format(facts=ftext, voice=VOICE)}])
     if r.stop_reason != "end_turn":
         raise RuntimeError(f"model stop_reason={r.stop_reason}")
     out = json.loads(next(b.text for b in r.content if b.type == "text"))["sentences"]
@@ -172,7 +180,7 @@ COUNT_RE = re.compile(r"\b(\d+|" + "|".join(NUM_WORDS) + r")\s+(?:(?:new|separat
                       r"companies|vendors?|contracts?|projects?)\b", re.I)
 QUANTITY = re.compile(r"\b(most|many|several|numerous|majority|dozens?|handful|a number of|half|bulk|"
                       r"totals?|totaling|combined|percent|%)\b", re.I)
-HYPE = re.compile(r"\b(significant(?:ly)?|major|notabl[ey]|key|landmark|sweeping|historic|dramatic(?:ally)?|"
+HYPE = re.compile(r"\b(funny|odd(?:ly)?|quirky|ironic(?:ally)?|curious(?:ly)?|amusing(?:ly)?|surprising(?:ly)?|believe it or not|significant(?:ly)?|major|notabl[ey]|key|landmark|sweeping|historic|dramatic(?:ally)?|"
                   r"crucial|critical|important(?:ly)?|striking(?:ly)?|unprecedented|controversial|unusual(?:ly)?|"
                   r"remarkabl[ey]|massive|huge|cutting-edge|game-?changer|signals?|poised|interesting(?:ly)?)\b", re.I)
 ADVICE = re.compile(r"\b(you|your|readers?|subscribers?|should|worth (?:watching|noting|following)|keep an eye|"
