@@ -26,4 +26,4 @@ Repository secrets: `HF_TOKEN` (write access to the dataset), `ANTHROPIC_API_KEY
 - The "Commit data" step pushes straight to `main`, so branch protection would stop it.
 
 ## What it costs
-Only the Monday issue calls an LLM (`ota_watch/digest.py`; the model defaults to `claude-opus-5-5`, set `OTA_MODEL` to change it). Each issue file in `data/issues/` records its input and output tokens under `usage`.
+Only the Monday issue calls an LLM (`ota_watch/digest.py`; the model defaults to `claude-opus-5-5`, set `OTA_MODEL` to change it). Each issue file in `data/issues/` records its input and output tokens under `usage`. The issue makes two calls: the picks, then a short opening on what the week's new agreements are for (`ota_watch/opening.py`), which code checks sentence by sentence and leaves out if any check fails; its result and tokens are under `opening`. `uv run python -m ota_watch.opening data/issues/<date>.json` prints an opening for an existing issue and writes nothing.
