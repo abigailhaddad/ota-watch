@@ -241,8 +241,11 @@ def sentence_problems(s: dict, f: dict, index: dict, recs: list[dict]) -> list[s
         if not any(abs(val - a) <= tol for a in allowed):
             out.append(f"{label}: dollar figure {val:,.0f} is not a cited record's obligation or their sum")
     signed = {r.get("signed") for r in rows if r.get("signed")}
+    written = {" ".join(x.split()).replace(" ,", ",").lower() for x in re.findall(r"\b(?:" + "|".join(MONTHS) + r")\s+\d{1,2}(?:,\s*\d{4})?", ctx)}
     for m in re.finditer(r"\b(" + "|".join(MONTHS) + r")\s+(\d{1,2})(?:st|nd|rd|th)?(?:,?\s+(\d{4}))?\b", text):
         mon, day, yr = MONTHS.index(m.group(1)) + 1, int(m.group(2)), m.group(3)
+        if " ".join(m.group(0).split()).lower() in written:   # the same date written out in the cited text
+            continue
         if not any(d[5:7] == f"{mon:02d}" and d[8:10] == f"{day:02d}" and (not yr or d[:4] == yr) for d in signed):
             out.append(f"{label}: date not a signed date of its cited records: {m.group(0)!r}")
     n_vendors = len({r.get("vendor") for r in rows if r.get("vendor")})
