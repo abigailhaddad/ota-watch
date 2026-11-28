@@ -210,6 +210,12 @@ def test_publish_to_an_empty_dataset(tmp_path, monkeypatch):
     monkeypatch.setattr(huggingface_hub, "HfApi", lambda: fake)
     monkeypatch.setattr(huggingface_hub, "hf_hub_download", fake.download)
     monkeypatch.setattr(hf.collect, "load", lambda *a, **k: {"A": doc("A"), "B": doc("B")})
+    monkeypatch.delenv("ALLOW_SHRINK", raising=False)
+    with pytest.raises(SystemExit, match="Not publishing"):
+        hf.publish(None)  # would replace the full history with documents.csv alone
+    assert fake.commits == []
+    fake.calls.clear()
+    monkeypatch.setenv("ALLOW_SHRINK", "1")
     hf.publish(None)
     assert fake.calls == ["create_repo", "download", "create_repo"]  # second is the commit's own exist_ok call
     (message, files), = fake.commits

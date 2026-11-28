@@ -33,7 +33,9 @@ import datetime as dt
 import io
 import json
 import logging
+import os
 import re
+import time
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -49,6 +51,34 @@ MONEY = {"obligated", "total_obligated_raw", "total_all_options_raw"}
 COLUMNS = collect.COLUMNS
 
 log = logging.getLogger(__name__)
+
+TRANSIENT_STATUS = {408, 429, 500, 502, 503, 504}
+
+
+def _transient(e: Exception) -> bool:
+    """A rate limit, a server error, or a dropped connection: worth another try."""
+    status = getattr(getattr(e, "response", None), "status_code", None)
+    if status is not None:
+        return status in TRANSIENT_STATUS
+    # httpx (what huggingface_hub uses) raises TransportError subclasses for timeouts and
+    # dropped connections; requests raises ConnectionError / Timeout.
+    return isinstance(e, (ConnectionError, TimeoutError)) or any(
+        c.__name__ in ("TransportError", "ConnectionError", "Timeout") for c in type(e).__mro__)
+
+
+def hf_retry(fn, *args, tries: int = 4, wait: float = 10, **kwargs):
+    """fn(*args, **kwargs), tried up to `tries` times on transient errors, waiting
+    wait, 2*wait, 4*wait seconds between tries. Any other error, or the last one, is raised.
+    huggingface_hub retries its uploads but not the final commit call itself."""
+    for attempt in range(tries):
+        try:
+            return fn(*args, **kwargs)
+        except Exception as e:
+            if attempt == tries - 1 or not _transient(e):
+                raise
+            log.warning("Hugging Face: %s (try %d of %d); retrying", e, attempt + 1, tries)
+            time.sleep(wait * 2 ** attempt)
+    raise AssertionError("unreachable")
 
 
 def feed_count(start: dt.date, end: dt.date, session=None) -> int:
@@ -343,13 +373,27 @@ def current_rows(api, download) -> list[dict]:
     import pyarrow.parquet as pq
     from huggingface_hub.errors import EntryNotFoundError, RepositoryNotFoundError
 
-    api.create_repo(REPO_ID, repo_type="dataset", exist_ok=True)
+    hf_retry(api.create_repo, REPO_ID, repo_type="dataset", exist_ok=True)
     try:
-        path = download(REPO_ID, PARQUET, repo_type="dataset")
+        path = hf_retry(download, REPO_ID, PARQUET, repo_type="dataset")
     except (EntryNotFoundError, RepositoryNotFoundError):
         log.info("%s has no %s yet; starting from an empty table", REPO_ID, PARQUET)
         return []
     return pq.read_table(path).to_pylist()
+
+
+def check_base(base: list[dict]) -> None:
+    """Stop before replacing the full history with only documents.csv (the last LOOKBACK_DAYS).
+
+    The daily publish lays documents.csv over the table already on Hugging Face, so it can
+    only add rows -- unless that table is missing, when it would upload the last
+    LOOKBACK_DAYS alone. Set ALLOW_SHRINK=1 to publish anyway (e.g. a brand-new dataset);
+    `publish --history DIR` rebuilds from a backfill instead."""
+    if not base and os.environ.get("ALLOW_SHRINK") != "1":
+        raise SystemExit(
+            f"{REPO_ID} has no {PARQUET} (or it is empty): publishing now would replace the full "
+            f"history with only the last {collect.LOOKBACK_DAYS} days. Not publishing. Rebuild with "
+            "`python -m ota_watch.hf publish --history DIR`, or set ALLOW_SHRINK=1 to publish anyway.")
 
 
 def publish(history: Path | None) -> None:
@@ -362,6 +406,7 @@ def publish(history: Path | None) -> None:
         base = load_history(history)
     else:
         base = current_rows(api, hf_hub_download)
+        check_base(base)
     rows, counts = merge(base, collect.load())
     schema = pa.schema([(c, pa.float64() if c in MONEY else pa.string()) for c in COLUMNS])
     buf = io.BytesIO()
@@ -374,8 +419,8 @@ def publish(history: Path | None) -> None:
     built = dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat()
     dictionary = data_dictionary(buf.getvalue())
     from huggingface_hub import CommitOperationAdd
-    api.create_repo(REPO_ID, repo_type="dataset", exist_ok=True)
-    api.create_commit(REPO_ID, repo_type="dataset", commit_message=f"Update {built}: {len(rows):,} documents",
+    hf_retry(api.create_repo, REPO_ID, repo_type="dataset", exist_ok=True)
+    hf_retry(api.create_commit, REPO_ID, repo_type="dataset", commit_message=f"Update {built}: {len(rows):,} documents",
                       operations=[CommitOperationAdd(PARQUET, buf.getvalue()),
                                   CommitOperationAdd(CSV, sbuf.getvalue().encode("utf-8")),
                                   CommitOperationAdd("README.md", card(rows, built, dictionary).encode("utf-8"))])

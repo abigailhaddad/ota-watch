@@ -28,6 +28,7 @@ on:
 
 permissions:
   contents: write
+  issues: write
 
 concurrency:
   group: weekly
@@ -95,3 +96,13 @@ jobs:
           echo "$built"
           gh release delete latest-data --cleanup-tag --yes 2>/dev/null || true
           gh release create latest-data ota-watch.sqlite --title "Latest data (SQLite)" --notes "SQLite copy of https://huggingface.co/datasets/abigailhaddad/ota-watch at commit $sha, built $(date -u +%Y-%m-%d) by the daily OTA Watch workflow. One table, ot_documents; columns are described in docs/data_dictionary.md. ${built#wrote }"
+
+      - name: Open or comment on issue on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="OTA Watch daily run failed"
+          body="Run failed: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          num=$(gh issue list --state open --search "in:title \"$title\"" --json number -q '.[0].number')
+          if [ -n "$num" ]; then gh issue comment "$num" --body "$body"; else gh issue create --title "$title" --body "$body"; fi

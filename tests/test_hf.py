@@ -108,3 +108,53 @@ def test_idv_overlap_bound_and_timing():
     assert (st["idvs"], st["idvs_with_orders"]) == (2, 1)
     assert st["on_idvs_with_orders"] == 110.0 and st["on_idvs_with_orders_before_first_order"] == 100.0
     assert st["overlap_bound"] == 30.0
+
+
+def test_hf_retry_retries_transient_errors_only(monkeypatch):
+    import httpx2
+    import pytest
+    from huggingface_hub.errors import HfHubHTTPError
+
+    monkeypatch.setattr(hf.time, "sleep", lambda s: None)
+
+    def failing(status, n):
+        calls = []
+
+        def fn():
+            calls.append(1)
+            if len(calls) <= n:
+                resp = httpx2.Response(status, request=httpx2.Request("POST", "https://huggingface.co/x"))
+                raise HfHubHTTPError(f"{status}", response=resp)
+            return "ok"
+        return fn, calls
+
+    fn, calls = failing(503, 2)
+    assert hf.hf_retry(fn) == "ok" and len(calls) == 3
+    fn, calls = failing(429, 9)
+    with pytest.raises(HfHubHTTPError):
+        hf.hf_retry(fn)
+    assert len(calls) == 4
+    fn, calls = failing(401, 9)
+    with pytest.raises(HfHubHTTPError):
+        hf.hf_retry(fn)
+    assert len(calls) == 1
+
+    tries = []
+
+    def drops():
+        tries.append(1)
+        if len(tries) == 1:
+            raise httpx2.ConnectError("reset")
+        return "ok"
+    assert hf.hf_retry(drops) == "ok" and len(tries) == 2
+
+
+def test_publish_refuses_to_replace_history_with_an_empty_base(monkeypatch):
+    import pytest
+
+    monkeypatch.delenv("ALLOW_SHRINK", raising=False)
+    with pytest.raises(SystemExit, match="Not publishing"):
+        hf.check_base([])
+    hf.check_base([row("A")])
+    monkeypatch.setenv("ALLOW_SHRINK", "1")
+    hf.check_base([])
