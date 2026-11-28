@@ -491,6 +491,7 @@ dependencies = [
     { name = "anthropic" },
     { name = "huggingface-hub" },
     { name = "pyarrow" },
+    { name = "pyyaml" },
     { name = "requests" },
 ]
 
@@ -504,6 +505,7 @@ requires-dist = [
     { name = "anthropic", specifier = ">=0.70" },
     { name = "huggingface-hub", specifier = ">=2.4.0" },
     { name = "pyarrow", specifier = ">=26.0.1" },
+    { name = "pyyaml", specifier = ">=6.0.3" },
     { name = "requests", specifier = ">=2.32" },
 ]
 

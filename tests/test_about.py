@@ -1,0 +1,36 @@
+"""2026-11-28: the about page is one sentence plus links to the files that hold the rules. Models, dollar amounts,
+counts and prompt text live in config/ota-watch.yaml and the linked code and must not be copied here."""
+import re
+from pathlib import Path
+
+from ota_watch import site
+from ota_watch.settings import CONFIG
+
+ROOT = Path(__file__).resolve().parent.parent
+
+
+def _main():
+    html = site.about_page()
+    return html[html.index("<main>"):html.index("</main>")]
+
+
+def test_about_page_hard_codes_nothing_that_drifts():
+    main = _main()
+    text = re.sub(r"<[^>]+>", " ", main)
+    assert "claude-" not in main.lower()
+    assert not re.search(r"\$\s?\d", text)
+    assert not re.search(r"\d", text), "no numbers (counts, thresholds) on the about page"
+    for stage in CONFIG.values():
+        assert str(stage["model"]) not in main
+        for key in ("prompt", "voice"):
+            for line in str(stage.get(key, "")).splitlines():
+                if len(line.strip()) > 40:
+                    assert line.strip()[:40] not in text
+
+
+def test_about_page_links_files_that_exist():
+    paths = set(re.findall(re.escape(site.PROJECT_URL) + r"/blob/main/([^\"#]+)", _main()))
+    assert paths == {"ota_watch/digest.py", "config/ota-watch.yaml", "ota_watch/opening.py"}
+    for p in paths:
+        assert (ROOT / p).exists(), p
+    assert site.DATASET_URL in _main()

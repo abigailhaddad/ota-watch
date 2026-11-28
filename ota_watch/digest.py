@@ -46,41 +46,15 @@ import sys
 from pathlib import Path
 
 from . import collect
+from .settings import CONFIG
 
 ROOT = Path(__file__).resolve().parent.parent
 ISSUES = ROOT / "data" / "issues"
-MODEL = os.environ.get("OTA_MODEL", "claude-opus-5-5")
-MAX_PICKS = 5
+_CFG = CONFIG["digest"]   # config/ota-watch.yaml
+MODEL = os.environ.get("OTA_MODEL", _CFG["model"])
+MAX_PICKS = _CFG["max_picks"]
 
-PROMPT = """You help write a weekly page about federal Other Transaction (OT) awards newly public in FPDS
-(the federal procurement database). OTs are agreements outside the normal contracting rules. Defense OT records
-become public about 90 days after signing, so most records here were signed months ago.
-
-Below are all {n} FPDS records that became public this week, one per line, each starting with its [index].
-Each record is one action: a new agreement, order or vehicle (mod 0) or a modification. "obligated" is the money
-obligated by that one action, not a total value.
-
-Pick the {lo} to {hi} most remarkable records for a reader who tracks unusual federal spending: for example equity
-investments, uncompeted awards, large production follow-ons, consortium awards where the real performer is named
-only in the description, odd purposes, unusual funding arrangements. A pick may group several records that are
-clearly one story (same office, same program, same week); list all their indices. Prefer new awards and money
-moving over zero-dollar administrative modifications. If nothing stands out, return fewer picks.
-
-Rules:
-- Use ONLY what the records say. No outside knowledge about companies, laws, programs or people; do not explain
-  what a statute or program is unless the record says it.
-- Name agencies, offices and programs exactly as the record writes them; do not expand abbreviations or rename
-  them (if the record says "DEPT OF THE AIR FORCE / FA8819 SDA AND COMBAT POWER", do not call it a Space Force
-  office; if it says "DIRECTOR SCO", do not spell SCO out).
-- Don't characterize a record beyond its fields (no "everyday", "routine", "first-ever") unless the record says so.
-- "quote" must be copied exactly from the description of record quote_index (which must be one of the pick's
-  indices), 10 to 200 characters.
-- Do not state dollar amounts except a record's obligated amount or the sum of the pick's records' amounts.
-- headline: plain, specific, no hype, at most 120 characters. why: 1 to 3 sentences.
-
-Records:
-{records}
-"""
+PROMPT = _CFG["prompt"]
 
 SCHEMA = {
     "type": "object",

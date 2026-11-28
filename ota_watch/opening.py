@@ -37,11 +37,13 @@ import sys
 from pathlib import Path
 
 from . import digest
+from .settings import CONFIG
 
-MODEL = os.environ.get("OTA_MODEL", "claude-opus-5-5")
-MAX_NEW = 50
-MAX_MODS = 10
-DESC_CHARS = 300
+_CFG = CONFIG["opening"]   # config/ota-watch.yaml
+MODEL = os.environ.get("OTA_MODEL", _CFG["model"])
+MAX_NEW = _CFG["max_new"]
+MAX_MODS = _CFG["max_mods"]
+DESC_CHARS = _CFG["desc_chars"]
 
 
 # ── facts ─────────────────────────────────────────────────────────────────
@@ -106,43 +108,10 @@ SCHEMA = {
 }
 
 # The newsletter's voice (wording from usajobs-weekly's llm.VOICE), set per topic.
-VOICE = ("Voice: dry and a little wry, like a colleague who reads every record and points out the good bits. "
-         "Short declarative sentences. Let the record be the joke by describing it exactly; never announce that "
-         "something is funny or odd. No puns, no exclamation marks, and no mocking the people involved. Keep it light: mostly plain, with at most one wry turn.")
+VOICE = _CFG["voice"]
 
 
-PROMPT = """You write the opening paragraph of a weekly page about federal Other Transaction (OT) agreements
-newly public in FPDS. Defense OT records become public about 90 days after signing. Readers track federal
-spending: reporters, congressional staff, lawyers. Below the paragraph the page already has a few picked-out
-records with headlines, and every record with its numbers.
-
-Write three or four plain sentences that say what this week's new agreements are for: the technologies,
-programs and kinds of work their descriptions name, with the office and vendor where that helps, drawn mostly
-from records not picked out below. Good sentences sound like "Naval Surface Warfare Center Crane issued
-prototype orders for MACH-XL 26 projects naming Aerojet Rocketdyne and Kratos" or "The OSD DIRECTOR office
-signed prototype agreements with General Atomics and Westinghouse Government Services for advanced nuclear
-reactors on military bases." At most one sentence may be about a record marked picked_out_below.
-
-Rules:
-- Use only what the records say. No outside knowledge about companies, laws, programs or people; do not explain
-  an acronym the record does not spell out, and do not rename offices or agencies.
-- Every number, date, dollar figure and name you write must appear in the records that sentence cites. Write
-  dates as "July 16". Give a dollar figure only as a cited record's obligated amount or their sum.
-- If you count things ("two prototype agreements"), the count must equal the records you cite for it.
-- Do not use counting or comparing words: no "most", "many", "several", "a number of", "largest", no totals.
-- Say "not competed", "new", "production", "prototype" or "vehicle" only when the cited record's fields say so.
-- Don't mention the input, these instructions, or what a record lacks. No adjectives of judgment
-  (significant, major, notable, key, unusual), no advice to the reader, no exclamation marks, no Markdown.
-
-For each sentence give its text and its sources: the id of every record it draws on (e.g. "R4"), each with a
-quote copied character for character from that record's description (at least three words) that the sentence
-rests on.
-
-{voice}
-
-This week:
-{facts}
-"""
+PROMPT = _CFG["prompt"]
 
 
 def call_model(ftext: str, client=None) -> tuple[list[dict], dict]:

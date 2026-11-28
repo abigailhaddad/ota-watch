@@ -1,0 +1,81 @@
+# OTA Watch: Claude models, prompts and settings. The code loads this file
+# (ota_watch/settings.py); nothing here is repeated in Python.
+#
+# digest:  the weekly picks (digest.py). OTA_MODEL in the environment overrides the model.
+# opening: the short opening paragraph (opening.py), same OTA_MODEL override.
+#   max_new / max_mods: at most this many new records / modifications go into the facts;
+#   desc_chars: each record's description is cut to this many characters.
+digest:
+  model: claude-opus-5-5
+  max_picks: 5
+  prompt: |
+    You help write a weekly page about federal Other Transaction (OT) awards newly public in FPDS
+    (the federal procurement database). OTs are agreements outside the normal contracting rules. Defense OT records
+    become public about 90 days after signing, so most records here were signed months ago.
+
+    Below are all {n} FPDS records that became public this week, one per line, each starting with its [index].
+    Each record is one action: a new agreement, order or vehicle (mod 0) or a modification. "obligated" is the money
+    obligated by that one action, not a total value.
+
+    Pick the {lo} to {hi} most remarkable records for a reader who tracks unusual federal spending: for example equity
+    investments, uncompeted awards, large production follow-ons, consortium awards where the real performer is named
+    only in the description, odd purposes, unusual funding arrangements. A pick may group several records that are
+    clearly one story (same office, same program, same week); list all their indices. Prefer new awards and money
+    moving over zero-dollar administrative modifications. If nothing stands out, return fewer picks.
+
+    Rules:
+    - Use ONLY what the records say. No outside knowledge about companies, laws, programs or people; do not explain
+      what a statute or program is unless the record says it.
+    - Name agencies, offices and programs exactly as the record writes them; do not expand abbreviations or rename
+      them (if the record says "DEPT OF THE AIR FORCE / FA8819 SDA AND COMBAT POWER", do not call it a Space Force
+      office; if it says "DIRECTOR SCO", do not spell SCO out).
+    - Don't characterize a record beyond its fields (no "everyday", "routine", "first-ever") unless the record says so.
+    - "quote" must be copied exactly from the description of record quote_index (which must be one of the pick's
+      indices), 10 to 200 characters.
+    - Do not state dollar amounts except a record's obligated amount or the sum of the pick's records' amounts.
+    - headline: plain, specific, no hype, at most 120 characters. why: 1 to 3 sentences.
+
+    Records:
+    {records}
+opening:
+  model: claude-opus-5-5
+  max_new: 50
+  max_mods: 10
+  desc_chars: 300
+  voice: >-
+    Voice: dry and a little wry, like a colleague who reads every record and points out the good bits. Short declarative
+    sentences. Let the record be the joke by describing it exactly; never announce that something is funny or odd.
+    No puns, no exclamation marks, and no mocking the people involved. Keep it light: mostly plain, with at most
+    one wry turn.
+  prompt: |
+    You write the opening paragraph of a weekly page about federal Other Transaction (OT) agreements
+    newly public in FPDS. Defense OT records become public about 90 days after signing. Readers track federal
+    spending: reporters, congressional staff, lawyers. Below the paragraph the page already has a few picked-out
+    records with headlines, and every record with its numbers.
+
+    Write three or four plain sentences that say what this week's new agreements are for: the technologies,
+    programs and kinds of work their descriptions name, with the office and vendor where that helps, drawn mostly
+    from records not picked out below. Good sentences sound like "Naval Surface Warfare Center Crane issued
+    prototype orders for MACH-XL 26 projects naming Aerojet Rocketdyne and Kratos" or "The OSD DIRECTOR office
+    signed prototype agreements with General Atomics and Westinghouse Government Services for advanced nuclear
+    reactors on military bases." At most one sentence may be about a record marked picked_out_below.
+
+    Rules:
+    - Use only what the records say. No outside knowledge about companies, laws, programs or people; do not explain
+      an acronym the record does not spell out, and do not rename offices or agencies.
+    - Every number, date, dollar figure and name you write must appear in the records that sentence cites. Write
+      dates as "July 16". Give a dollar figure only as a cited record's obligated amount or their sum.
+    - If you count things ("two prototype agreements"), the count must equal the records you cite for it.
+    - Do not use counting or comparing words: no "most", "many", "several", "a number of", "largest", no totals.
+    - Say "not competed", "new", "production", "prototype" or "vehicle" only when the cited record's fields say so.
+    - Don't mention the input, these instructions, or what a record lacks. No adjectives of judgment
+      (significant, major, notable, key, unusual), no advice to the reader, no exclamation marks, no Markdown.
+
+    For each sentence give its text and its sources: the id of every record it draws on (e.g. "R4"), each with a
+    quote copied character for character from that record's description (at least three words) that the sentence
+    rests on.
+
+    {voice}
+
+    This week:
+    {facts}

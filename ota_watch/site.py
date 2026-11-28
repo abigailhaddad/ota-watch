@@ -25,8 +25,10 @@ import urllib.parse
 from email.utils import format_datetime
 from pathlib import Path
 
-from .config import DATASET_URL, GITHUB_REPO, HF_REPO_ID, ISSUE_URL, PROJECT_URL, SITE_URL
-from .digest import ISSUES, MAX_PICKS, money
+from .config import DATASET_URL, HF_REPO_ID, ISSUE_URL, PROJECT_URL, SITE_URL
+from .digest import ISSUES, money
+
+FPDS_URL = "https://www.fpds.gov/"
 from .opening import kept_text
 
 TITLE = "OTA Watch"
@@ -246,32 +248,18 @@ def index_page(issues: list[dict]) -> str:
 
 
 def about_page() -> str:
+    # 2026-11-28: one sentence on what is covered and from where, then one link per pipeline step. Models, counts
+    # and thresholds live in the linked files, not here (tests/test_about.py checks).
+    src = f"{PROJECT_URL}/blob/main"
     body = f"""<h1>About {e(TITLE)}</h1>
-<p>{e(TAGLINE)}.</p>
-<p><strong>What an OT is.</strong> Other Transactions are agreements made outside the Federal Acquisition
-Regulation for prototypes and their follow-on production. They are reported to
-FPDS, the federal procurement database, but not to USAspending.</p>
-<p><strong>What each week has.</strong> Every OT record that first appeared in FPDS since the previous week:
-new agreements, orders and vehicles, and modifications. Each record is one action, and its dollar amount is what
-that action obligated. Claude reads them all and picks out a few (at most {MAX_PICKS}, sometimes none). The issue
-page then lists the {WEEK_TOP} other new agreements, orders and vehicles with the largest obligations; every record
-of the week, modifications included, is on that week's "every record" page. A pick that groups more than
-{GROUP_LIST_MAX} records names them by award number and lists them there.</p>
-<p><strong>The Defense delay.</strong> Defense records become public in FPDS months after they are signed, and
-some are entered later still, so most of each week's Defense records were signed months before. Other agencies'
-records can appear sooner. The <a href="{e(DATASET_URL)}">dataset card</a> gives the delay measured from the
-data.</p>
-<p><strong>Chosen and written up by Claude.</strong> The headlines and explanations are Claude's. The fact lines,
-amounts and totals come straight from the FPDS records, a pick's quote must appear in its record's description, and
-a pick whose dollar figures don't match its records is dropped. AI can still misread a record: check the FPDS
-record (each one links to FPDS's public feed, which shows it as XML) before relying on anything.</p>
-<p>Spotted a wrong pick, quote or figure, or have a suggestion?
-<a href="{ISSUE_URL}">Open an issue on GitHub</a>.</p>
-<p><strong>All the data.</strong> Every OT record in FPDS is on Hugging Face as Parquet and
-CSV, updated daily: <a href="{e(DATASET_URL)}">huggingface.co/datasets/{e(HF_REPO_ID)}</a>.</p>
-<p>Code, the recent records the weekly lists use (<code>data/documents.csv</code>) and rules:
-<a href="{e(PROJECT_URL)}">github.com/{e(GITHUB_REPO)}</a>. RSS: <a href="feed.xml">feed.xml</a>.
-No JavaScript, no cookies, no trackers.</p>"""
+<p>Each week's federal Other Transaction (OT) records newly public in <a href="{FPDS_URL}">FPDS</a>, the federal
+procurement database, with a few picked out and written up by Claude.</p>
+<ul>
+<li>Data: <a href="{FPDS_URL}">FPDS</a>; every record: <a href="{e(DATASET_URL)}">huggingface.co/datasets/{e(HF_REPO_ID)}</a></li>
+<li>Selection: <a href="{e(src)}/ota_watch/digest.py">digest.py</a></li>
+<li>Claude: <a href="{e(src)}/config/ota-watch.yaml">ota-watch.yaml</a></li>
+<li>Checks: <a href="{e(src)}/ota_watch/digest.py">digest.py</a> (picks), <a href="{e(src)}/ota_watch/opening.py">opening.py</a> (opening)</li>
+</ul>"""
     return page(f"About · {TITLE}", body)
 
 
