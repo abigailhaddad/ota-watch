@@ -2,50 +2,24 @@
 
 <!-- The site, dataset and issues links in this file match the defaults in ota_watch/config.py. A new owner swaps them by hand (see HANDOFF.md). -->
 
-**https://ota-watch.abigailhaddad.com**: every federal Other Transaction (OT) award record newly public in
-FPDS, listed weekly, with the most remarkable few picked out and summarized by Claude.
+Every federal Other Transaction (OT) award record newly public in FPDS, listed weekly, with a few picked out by Claude.
 
-**Every OT record in FPDS**, not just the recent ones the site uses, is on Hugging Face:
-[abigailhaddad/ota-watch](https://huggingface.co/datasets/abigailhaddad/ota-watch), as Parquet and CSV,
-updated daily. Read its card before using it: it covers who the vendors are, money on OT IDVs, which agencies
-are in the data, and how the mix changes over time, with every count and dollar figure computed from the data
-each time it's built.
+## Links
 
-OTs are agreements made outside the Federal Acquisition Regulation for prototypes and follow-on production.
-They are reported to FPDS (the federal procurement database) but not to USAspending. FPDS's public ATOM feed
-is the only source used here.
+- Dataset (every OT record in FPDS): [abigailhaddad/ota-watch](https://huggingface.co/datasets/abigailhaddad/ota-watch) on Hugging Face; read its card before using it
+- Website: [ota-watch.abigailhaddad.com](https://ota-watch.abigailhaddad.com)
+- How this is made: [ota-watch.abigailhaddad.com/about](https://ota-watch.abigailhaddad.com/about)
+- Sign up (Federal Data Stories, topic "OTA Watch"): [data-stories.abigailhaddad.com](https://data-stories.abigailhaddad.com/#subscribe)
+- Data dictionary: [docs/data_dictionary.md](docs/data_dictionary.md); SQLite copy: [latest-data release](https://github.com/abigailhaddad/ota-watch/releases/tag/latest-data)
 
 ## How it works
 
-1. **Collect** (`ota_watch/collect.py`): every day, read every OT document signed in the last
-   `LOOKBACK_DAYS` from FPDS and add the ones not seen before to `data/documents.csv` with `first_seen` = the
-   time of that run (UTC). "Newly public" is decided by what FPDS showed before, not by signing date: Defense
-   OT records become public in FPDS months after signing, and some are entered later still. Records already
-   public when the project started are marked `first_seen = baseline` (on Hugging Face, so are records the
-   collection never saw because they were signed too long ago).
-2. **Digest** (`ota_watch/digest.py`), Mondays only: the week's records go to Claude (`MODEL`), which picks
-   up to `MAX_PICKS` and writes a headline and a short explanation for each, quoting the record's
-   description. Code then checks every pick: the quote must be in the record (ignoring case and whitespace),
-   and every dollar figure must be one of the pick's records' obligations or their sum; a pick that fails is
-   dropped (kept in the issue file under `dropped`). All other numbers on the page (counts, totals, fact
-   lines) are computed from the records, not written by the model. One issue a week at most.
-3. **Hugging Face** (`ota_watch/hf.py`): the full history (a backfill of every OT document FPDS has) with
-   `data/documents.csv` laid over it each day. Documents signed before the collection window aren't re-read
-   daily; rerun `python -m ota_watch.hf backfill DIR` and `publish --history DIR` to refresh them.
-4. **Site** (`ota_watch/site.py`): static pages from `data/issues/*.json`, deployed to Cloudflare Pages.
-   No JavaScript, no cookies, no trackers.
+- Daily collection from FPDS's public feed: [collect.py](ota_watch/collect.py), [fpds.py](ota_watch/fpds.py), scheduled by [weekly.yml](.github/workflows/weekly.yml)
+- Weekly issue, picks and checks: [digest.py](ota_watch/digest.py), [opening.py](ota_watch/opening.py); prompts and model settings: [config/ota-watch.yaml](config/ota-watch.yaml)
+- Website: [site.py](ota_watch/site.py); Hugging Face dataset and card: [hf.py](ota_watch/hf.py)
+- Dollars are the money obligated by each action. FPDS's "total" fields on OT records are unreliable and are never shown.
 
-## Caveats
-
-* **Dollars are obligations on each action.** FPDS's "total" and "base and all options" values on OT records
-  are unreliable and are never shown; they are kept as `*_raw` columns for reference.
-* **The Defense delay** means most of each week's Defense records were signed months earlier. The dataset
-  card gives the delay measured from the data.
-* **A record entered in FPDS after the collection window has passed its signing date is missed by the
-  weekly site.** It reaches the Hugging Face dataset only when the full backfill is rerun.
-* Claude can misread a record. Each record links to FPDS's public feed (XML).
-
-## Run it
+## Running locally
 
 ```sh
 uv sync
@@ -53,29 +27,12 @@ uv run pytest
 uv run python -m ota_watch.collect                       # today's FPDS read
 ANTHROPIC_API_KEY=... uv run python -m ota_watch.digest  # this week's issue
 uv run python -m ota_watch.site --out site/dist
-HF_TOKEN=... uv run python -m ota_watch.hf publish       # update the Hugging Face dataset
+uv run python -m ota_watch.hf backfill DIR               # full history; then:
+HF_TOKEN=... uv run python -m ota_watch.hf publish --history DIR
 ```
-
-To refresh records signed more than 400 days ago (the daily run doesn't re-read them), or to fill a new
-dataset with the full history: `uv run python -m ota_watch.hf backfill DIR`, then
-`HF_TOKEN=... uv run python -m ota_watch.hf publish --history DIR`. The backfill reads one calendar year
-at a time into `DIR`; if it is interrupted, rerunning resumes.
-
-## Data dictionary
-
-[`docs/data_dictionary.md`](docs/data_dictionary.md) lists every column of the Hugging Face table with its type, a description, the share of rows that have a value, and an example. Types, counts and examples are read from the published parquet files; descriptions are in [`docs/tables.toml`](docs/tables.toml), written from the code that builds each column (`ota_watch/fpds.py` names the FPDS element behind each one). Regenerate it with
-
-    uv run python ota_watch/data_docs.py fetch hf_data   # download the current table from Hugging Face
-    uv run python ota_watch/data_docs.py write hf_data   # write docs/data_dictionary.md
-
-`ota_watch/hf.py` puts the same section on the Hugging Face dataset card. `ota_watch/data_docs.py` stops with an error (and so does `ota_watch.hf publish`, before uploading) if a parquet column has no description in `docs/tables.toml` or a described column is gone, and the daily workflow runs that check too.
-
-## SQLite download
-
-The daily workflow builds `ota-watch.sqlite` from the files on Hugging Face (table `ot_documents`, plus `_source`, which records the Hugging Face commit) and attaches it to the GitHub release [`latest-data`](https://github.com/abigailhaddad/ota-watch/releases/tag/latest-data). The release is replaced whenever the Hugging Face commit changes. To build it yourself:
-
-    uv run python ota_watch/build_sqlite.py hf_data ota-watch.sqlite
 
 Spotted a wrong pick, quote or figure? [Open an issue](https://github.com/abigailhaddad/ota-watch/issues/new).
 
-Data: FPDS records are U.S. government data. Code: MIT.
+## License
+
+Code: MIT ([LICENSE](LICENSE)). Data: FPDS records are U.S. government data.

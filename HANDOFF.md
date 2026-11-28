@@ -3,7 +3,7 @@
 ## What this is
 Every federal Other Transaction (OT) record in FPDS, a weekly site that picks out a few new awards, and the full record set on Hugging Face.
 
-- Code: https://github.com/abigailhaddad/ota-watch (README: how it works and the caveats)
+- Code: https://github.com/abigailhaddad/ota-watch (README: links and where each part of the pipeline lives)
 - Data: https://huggingface.co/datasets/abigailhaddad/ota-watch (the dataset card has the columns and known limits)
 - Site: https://ota-watch.abigailhaddad.com
 
@@ -16,7 +16,7 @@ Repository secrets: `HF_TOKEN` (write access to the dataset), `ANTHROPIC_API_KEY
 ## If you take it over
 - Owner names are in `ota_watch/config.py`; each can be set with an environment variable (`OTA_GITHUB_REPO`, `OTA_HF_REPO`, `OTA_SITE_URL`). The README also links the current owner's site, dataset and issues page. To find everything: `grep -rn abigailhaddad --exclude-dir=.git .`
 - Create: a Hugging Face dataset and token, a Cloudflare Pages project (default name `ota-watch`) with your domain, and the secrets above.
-- A new empty dataset: the daily publish is written to create it. That path is tested only against fakes. It then holds only the last 400 days (`LOOKBACK_DAYS` in `ota_watch/collect.py`). For older records, run the backfill described in the README (step 3).
+- A new empty dataset: the daily publish is written to create it. That path is tested only against fakes. It then holds only the last 400 days (`LOOKBACK_DAYS` in `ota_watch/collect.py`). For older records, run the backfill in the README ("Running locally").
 - The weekly issue needs an earlier issue to measure from. For the very first one, see the docstring at the top of `ota_watch/digest.py`.
 
 ## When it breaks
