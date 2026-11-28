@@ -44,7 +44,9 @@ def test_every_issue_ends_with_the_how_this_is_made_line():
         issue = json.loads(f.read_text())
         html = site.issue_content(issue)
         last = html.rstrip().splitlines()[-1]
-        link = f'<a href="{site.SITE_URL}/about">How this is made</a>'
+        link = (f'<a href="{site.SITE_URL}/about">How this is made</a> · '
+                f'<a href="https://github.com/abigailhaddad/ota-watch">Code</a>')
         claude = bool(issue["picks"] or site.kept_text(issue))
         assert last == f'<p class="note how">{"Written with Claude. " if claude else ""}{link}</p>', f.name
-    assert site.how_line(False) == '<p class="note how"><a href="https://ota-watch.abigailhaddad.com/about">How this is made</a></p>'
+    assert site.how_line(False) == ('<p class="note how"><a href="https://ota-watch.abigailhaddad.com/about">How this is made</a>'
+                                    ' · <a href="https://github.com/abigailhaddad/ota-watch">Code</a></p>')

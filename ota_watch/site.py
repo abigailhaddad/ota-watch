@@ -191,7 +191,7 @@ def issue_content(issue: dict) -> str:
 def how_line(claude_wrote: bool) -> str:
     """The last line of every issue (page and feed): a link to the about page (2026-11-28). "Written with Claude."
     only when Claude wrote something in the issue (picks or the opening)."""
-    link = f'<a href="{e(SITE_URL)}/about">How this is made</a>'
+    link = f'<a href="{e(SITE_URL)}/about">How this is made</a> · <a href="{e(PROJECT_URL)}">Code</a>'
     return f'<p class="note how">{"Written with Claude. " if claude_wrote else ""}{link}</p>'
 
 
