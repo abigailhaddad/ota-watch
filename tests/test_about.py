@@ -34,3 +34,17 @@ def test_about_page_links_files_that_exist():
     for p in paths:
         assert (ROOT / p).exists(), p
     assert site.DATASET_URL in _main()
+
+
+def test_every_issue_ends_with_the_how_this_is_made_line():
+    import json
+    issues = sorted((ROOT / "data" / "issues").glob("*.json"))
+    assert issues
+    for f in issues:
+        issue = json.loads(f.read_text())
+        html = site.issue_content(issue)
+        last = html.rstrip().splitlines()[-1]
+        link = f'<a href="{site.SITE_URL}/about">How this is made</a>'
+        claude = bool(issue["picks"] or site.kept_text(issue))
+        assert last == f'<p class="note how">{"Written with Claude. " if claude else ""}{link}</p>', f.name
+    assert site.how_line(False) == '<p class="note how"><a href="https://ota-watch.abigailhaddad.com/about">How this is made</a></p>'

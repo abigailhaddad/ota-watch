@@ -184,7 +184,15 @@ def issue_content(issue: dict) -> str:
                  f'{len(mods):,} modifications. <a href="{e(issue["date"])}-all.html">Every record this week</a>, '
                  "largest first. Dollar amounts are the money obligated by each action; FPDS's \"total value\" fields "
                  "on OT records are unreliable and are not used.</p>")
+    parts.append(how_line(bool(lead or issue["picks"])))
     return "\n".join(parts)
+
+
+def how_line(claude_wrote: bool) -> str:
+    """The last line of every issue (page and feed): a link to the about page (2026-11-28). "Written with Claude."
+    only when Claude wrote something in the issue (picks or the opening)."""
+    link = f'<a href="{e(SITE_URL)}/about">How this is made</a>'
+    return f'<p class="note how">{"Written with Claude. " if claude_wrote else ""}{link}</p>'
 
 
 WEEK_TOP = 5       # the issue page lists this many new records (largest obligation first, picks left out)
